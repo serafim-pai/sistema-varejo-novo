@@ -5,17 +5,26 @@
     <title>Cadastro de Produtos</title>
     <style>
         body { font-family: Arial; margin: 20px; }
-        nav a { margin-right: 15px; }
         input, button, select { padding: 8px; margin: 5px; }
         table { border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         .editando { background: #fff8d6; padding: 10px; border-radius: 5px; }
         #btnCancelar { display: none; }
+        .estoque-ok { background: #d4edda; color: #155724; font-weight: bold; }
+        .estoque-baixo { background: #fff3cd; color: #856404; font-weight: bold; }
+        .estoque-zerado { background: #f8d7da; color: #721c24; font-weight: bold; }
+        .legenda span { padding: 4px 8px; margin-right: 8px; border-radius: 4px; font-size: 14px; }
+        nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+        nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
+                letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+                padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
+        nav a:hover { background: #ff8a3d; }
+        nav a.ativo { background: #ffffff; color: #e65100; }
     </style>
 </head>
 <body>
     <nav>
-        <a href="/">Produtos</a>
+        <a href="/" class="ativo">Produtos</a>
         <a href="/vendas">Vendas</a>
         <a href="/relatorios">Relatórios</a>
     </nav>
@@ -33,9 +42,21 @@
     </div>
 
     <h2>Produtos em Estoque</h2>
+    <p class="legenda">
+        <span class="estoque-ok">Verde: estoque bom (10 ou mais)</span>
+        <span class="estoque-baixo">Amarelo: estoque baixo (1 a 9)</span>
+        <span class="estoque-zerado">Vermelho: sem estoque (0)</span>
+    </p>
     <table id="tabelaProdutos"></table>
 
     <script>
+        // Escolhe a cor da quantidade: verde, amarelo ou vermelho
+        function corEstoque(quantidade) {
+            if (quantidade <= 0) return 'estoque-zerado';
+            if (quantidade < 10) return 'estoque-baixo';
+            return 'estoque-ok';
+        }
+
         // Guarda o ID do produto que está sendo editado (null = cadastrando um novo)
         let idEmEdicao = null;
         let listaProdutos = [];
@@ -51,7 +72,7 @@
                             <td>${p.id}</td>
                             <td>${p.nome}</td>
                             <td>R$ ${p.preco.toFixed(2)}</td>
-                            <td>${p.quantidade}</td>
+                            <td class="${corEstoque(p.quantidade)}">${p.quantidade}</td>
                             <td>${p.categoria}</td>
                             <td>
                                 <button onclick="editarProduto(${p.id})">Editar</button>

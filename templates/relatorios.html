@@ -5,18 +5,27 @@
     <title>Relatórios</title>
     <style>
         body { font-family: Arial; margin: 20px; }
-        nav a { margin-right: 15px; }
         table { border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         .card { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
         .destaque { background: #e8f5e9; padding: 15px; margin: 10px 0; border-radius: 5px; font-size: 18px; }
+        .estoque-ok { background: #d4edda; color: #155724; font-weight: bold; }
+        .estoque-baixo { background: #fff3cd; color: #856404; font-weight: bold; }
+        .estoque-zerado { background: #f8d7da; color: #721c24; font-weight: bold; }
+        .legenda span { padding: 4px 8px; margin-right: 8px; border-radius: 4px; font-size: 14px; }
+        nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+        nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
+                letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+                padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
+        nav a:hover { background: #ff8a3d; }
+        nav a.ativo { background: #ffffff; color: #e65100; }
     </style>
 </head>
 <body>
     <nav>
         <a href="/">Produtos</a>
         <a href="/vendas">Vendas</a>
-        <a href="/relatorios">Relatórios</a>
+        <a href="/relatorios" class="ativo">Relatórios</a>
     </nav>
 
     <h1>Relatórios</h1>
@@ -36,9 +45,21 @@
     <table id="tabelaMaisVendidos"></table>
 
     <h2>Produtos em Estoque</h2>
+    <p class="legenda">
+        <span class="estoque-ok">Verde: estoque bom (10 ou mais)</span>
+        <span class="estoque-baixo">Amarelo: estoque baixo (1 a 9)</span>
+        <span class="estoque-zerado">Vermelho: sem estoque (0)</span>
+    </p>
     <table id="tabelaProdutos"></table>
 
     <script>
+        // Escolhe a cor da quantidade: verde, amarelo ou vermelho
+        function corEstoque(quantidade) {
+            if (quantidade <= 0) return 'estoque-zerado';
+            if (quantidade < 10) return 'estoque-baixo';
+            return 'estoque-ok';
+        }
+
         function carregarEstoque() {
             fetch('/api/produtos')
                 .then(r => r.json())
@@ -51,7 +72,7 @@
                         valorTotal += totalProduto;
                         html += `<tr>
                             <td>${p.nome}</td>
-                            <td>${p.quantidade}</td>
+                            <td class="${corEstoque(p.quantidade)}">${p.quantidade}</td>
                             <td>R$ ${p.preco.toFixed(2)}</td>
                             <td>R$ ${totalProduto.toFixed(2)}</td>
                         </tr>`;

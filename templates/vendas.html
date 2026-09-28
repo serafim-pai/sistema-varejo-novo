@@ -5,42 +5,78 @@
     <title>Registrar Venda</title>
     <style>
         body { font-family: Arial; margin: 20px; }
-        nav a { margin-right: 15px; }
         input, button, select { padding: 8px; margin: 5px; }
+        #busca { width: 280px; }
         table { border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .dica { color: #666; font-size: 14px; margin-left: 5px; }
+        nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+        nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
+                letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+                padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
+        nav a:hover { background: #ff8a3d; }
+        nav a.ativo { background: #ffffff; color: #e65100; }
     </style>
 </head>
 <body>
     <nav>
         <a href="/">Produtos</a>
-        <a href="/vendas">Vendas</a>
+        <a href="/vendas" class="ativo">Vendas</a>
         <a href="/relatorios">Relatórios</a>
     </nav>
 
     <h1>Registrar Venda</h1>
 
     <h2>Nova Venda</h2>
-    <select id="produto_id">
-        <option value="">Selecionar Produto</option>
-    </select>
+    <!-- Campo de busca: digite parte do nome e escolha na lista -->
+    <input type="text" id="busca" list="listaProdutos" placeholder="Digite o nome do produto..." autocomplete="off">
+    <datalist id="listaProdutos"></datalist>
     <input type="number" id="quantidade" placeholder="Quantidade">
     <button onclick="registrarVenda()">Vender</button>
+    <div class="dica">Dica: digite parte do nome (ex.: "cim") e clique no produto que aparecer.</div>
 
     <h2>Histórico de Vendas</h2>
     <table id="tabelaVendas"></table>
 
     <script>
+        let listaProdutos = [];
+
+        // Texto que aparece na lista para cada produto
+        function textoDoProduto(p) {
+            return `${p.nome} (estoque: ${p.quantidade})`;
+        }
+
         function carregarProdutos() {
             fetch('/api/produtos')
                 .then(r => r.json())
                 .then(produtos => {
-                    let opcoes = '<option value="">Selecionar Produto</option>';
+                    listaProdutos = produtos;
+                    let opcoes = '';
                     produtos.forEach(p => {
-                        opcoes += `<option value="${p.id}">${p.nome} (estoque: ${p.quantidade})</option>`;
+                        opcoes += `<option value="${textoDoProduto(p)}"></option>`;
                     });
-                    document.getElementById('produto_id').innerHTML = opcoes;
+                    document.getElementById('listaProdutos').innerHTML = opcoes;
                 });
+        }
+
+        // Descobre qual produto foi escolhido a partir do texto digitado
+        function produtoEscolhido() {
+            const texto = document.getElementById('busca').value.trim().toUpperCase();
+            if (!texto) return null;
+
+            // 1) Escolheu da lista (texto igual ao da opção)
+            let p = listaProdutos.find(item => textoDoProduto(item).toUpperCase() === texto);
+            if (p) return p;
+
+            // 2) Digitou o nome completo
+            p = listaProdutos.find(item => item.nome.toUpperCase() === texto);
+            if (p) return p;
+
+            // 3) Digitou só um pedaço e existe um único produto com ele
+            const parecidos = listaProdutos.filter(item => item.nome.toUpperCase().includes(texto));
+            if (parecidos.length === 1) return parecidos[0];
+
+            return null;
         }
 
         function carregarVendas() {
@@ -62,21 +98,26 @@
         }
 
         function registrarVenda() {
-            const produto_id = document.getElementById('produto_id').value;
+            const produto = produtoEscolhido();
             const quantidade = parseInt(document.getElementById('quantidade').value);
 
-            if (!produto_id || !quantidade) {
-                alert('Escolha um produto e digite a quantidade.');
+            if (!produto) {
+                alert('Produto não encontrado. Digite o nome e escolha um produto da lista.');
+                return;
+            }
+            if (!quantidade) {
+                alert('Digite a quantidade.');
                 return;
             }
 
             fetch('/api/vendas', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({produto_id, quantidade})
+                body: JSON.stringify({produto_id: produto.id, quantidade})
             }).then(r => r.json()).then(res => {
                 if (res.sucesso) {
-                    alert('Venda registrada!');
+                    alert('Venda registrada: ' + quantidade + ' x ' + produto.nome);
+                    document.getElementById('busca').value = '';
                     document.getElementById('quantidade').value = '';
                     carregarProdutos();
                     carregarVendas();

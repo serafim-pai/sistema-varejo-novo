@@ -30,11 +30,42 @@ def produtos():
 
     if request.method == 'POST':
         dados = request.json
+
+        # --- Validações: conferir os dados antes de salvar ---
+        nome = str(dados.get('nome', '')).strip()
+        categoria = str(dados.get('categoria', '')).strip()
+
+        if not nome:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Digite o nome do produto.'})
+        if not categoria:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Digite a categoria do produto.'})
+
+        try:
+            preco = float(dados.get('preco'))
+        except (TypeError, ValueError):
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Digite um preço válido.'})
+
+        try:
+            quantidade = int(dados.get('quantidade'))
+        except (TypeError, ValueError):
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Digite uma quantidade válida (número inteiro).'})
+
+        if preco <= 0:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'O preço precisa ser maior que zero.'})
+        if quantidade < 0:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'A quantidade não pode ser negativa.'})
+
         novo_produto = Produto(
-            nome=dados['nome'],
-            preco=float(dados['preco']),
-            quantidade=int(dados['quantidade']),
-            categoria=dados['categoria']
+            nome=nome.upper(),
+            preco=preco,
+            quantidade=quantidade,
+            categoria=categoria.upper()
         )
         session.add(novo_produto)
         session.commit()

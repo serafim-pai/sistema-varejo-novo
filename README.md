@@ -10,6 +10,7 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 3. **Histórico de vendas**: mostra o que foi vendido, a quantidade, o valor e a data.
 4. **Relatórios**: total de produtos e valor total em estoque.
 5. **Proteção**: não deixa vender mais do que existe no estoque.
+6. **Validações no cadastro**: não aceita nome ou categoria vazios, preço zero ou negativo, nem quantidade negativa.
 
 ## 🛠️ Tecnologias usadas
 
@@ -44,7 +45,7 @@ sistema-varejo-novo/
 
 ## 🚀 Próximos passos
 
-- [ ] Não aceitar campos vazios nem números negativos
+- [x] Não aceitar campos vazios nem números negativos
 - [ ] Mostrar no relatório qual produto mais vende
 - [ ] Melhorar a aparência das telas
 

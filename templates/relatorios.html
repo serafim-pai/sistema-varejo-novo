@@ -71,7 +71,7 @@
                 .then(r => r.json())
                 .then(produtos => {
                     let valorTotal = 0;
-                    let html = '<tr><th>Nome</th><th>Quantidade</th><th>Preço</th><th>Total</th></tr>';
+                    let html = '<tr><th>Nome</th><th>Quantidade</th><th>Unidade</th><th>Preço</th><th>Total</th></tr>';
 
                     produtos.forEach(p => {
                         const totalProduto = p.quantidade * p.preco;
@@ -79,6 +79,7 @@
                         html += `<tr>
                             <td>${p.nome}</td>
                             <td class="${corEstoque(p.quantidade)}">${textoQuantidade(p.quantidade)}</td>
+                            <td>${p.unidade}</td>
                             <td>R$ ${p.preco.toFixed(2)}</td>
                             <td>R$ ${totalProduto.toFixed(2)}</td>
                         </tr>`;
@@ -106,14 +107,14 @@
 
                     const primeiro = ranking[0];
                     document.getElementById('campeao').innerHTML =
-                        `🥇 O produto que mais vende é <strong>${primeiro.produto}</strong>, com <strong>${primeiro.quantidade_vendida}</strong> unidades vendidas.`;
+                        `🥇 O produto que mais vende é <strong>${primeiro.produto}</strong>, com <strong>${primeiro.quantidade_vendida} ${primeiro.unidade}</strong> vendidos.`;
 
-                    let html = '<tr><th>Posição</th><th>Produto</th><th>Unidades Vendidas</th><th>Nº de Vendas</th><th>Valor Vendido</th></tr>';
+                    let html = '<tr><th>Posição</th><th>Produto</th><th>Quantidade Vendida</th><th>Nº de Vendas</th><th>Valor Vendido</th></tr>';
                     ranking.forEach((item, i) => {
                         html += `<tr>
                             <td>${i + 1}º</td>
                             <td>${item.produto}</td>
-                            <td>${item.quantidade_vendida}</td>
+                            <td>${item.quantidade_vendida} ${item.unidade}</td>
                             <td>${item.numero_vendas}</td>
                             <td>R$ ${item.valor_vendido.toFixed(2)}</td>
                         </tr>`;

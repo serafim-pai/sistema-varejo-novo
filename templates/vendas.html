@@ -146,7 +146,7 @@
             const disponivel = p.quantidade - noCarrinho(p.id);
             caixa.textContent = disponivel <= 0
                 ? '🔴 Estoque: 0 (SEM ESTOQUE)'
-                : 'Estoque: ' + disponivel + ' un.';
+                : 'Estoque: ' + disponivel + ' ' + p.unidade;
             if (disponivel <= 0) caixa.className = 'estoque-zerado';
             else if (disponivel < 10) caixa.className = 'estoque-baixo';
             else caixa.className = 'estoque-ok';
@@ -163,13 +163,13 @@
 
             const disponivel = p.quantidade - noCarrinho(p.id);
             if (quantidade > disponivel) {
-                alert(`Estoque insuficiente de ${p.nome}. Disponível: ${disponivel} un.`);
+                alert(`Estoque insuficiente de ${p.nome}. Disponível: ${disponivel} ${p.unidade}`);
                 return;
             }
 
             const item = carrinho.find(i => i.produto_id === p.id);
             if (item) item.quantidade += quantidade;
-            else carrinho.push({produto_id: p.id, nome: p.nome, preco: p.preco, quantidade});
+            else carrinho.push({produto_id: p.id, nome: p.nome, preco: p.preco, unidade: p.unidade, quantidade});
 
             document.getElementById('busca').value = '';
             document.getElementById('quantidade').value = '';
@@ -207,8 +207,8 @@
                 total += subtotal;
                 html += `<tr>
                     <td>${item.nome}</td>
-                    <td>${item.quantidade}</td>
-                    <td>${dinheiro(item.preco)}</td>
+                    <td>${item.quantidade} ${item.unidade}</td>
+                    <td>${dinheiro(item.preco)} / ${item.unidade}</td>
                     <td>${dinheiro(subtotal)}</td>
                     <td><button class="btn-remover" onclick="removerDoCarrinho(${i})">Remover</button></td>
                 </tr>`;
@@ -242,7 +242,7 @@
             let linhas = '';
             res.itens.forEach(item => {
                 linhas += `<tr>
-                    <td>${item.quantidade} x ${item.produto}<br><small>${dinheiro(item.preco)} cada</small></td>
+                    <td>${item.quantidade} ${item.unidade} - ${item.produto}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
                     <td class="direita">${dinheiro(item.subtotal)}</td>
                 </tr>`;
             });
@@ -282,7 +282,7 @@
                         html += `<tr>
                             <td>${v.id}</td>
                             <td>${v.produto}</td>
-                            <td>${v.quantidade}</td>
+                            <td>${v.quantidade} ${v.unidade}</td>
                             <td>${dinheiro(v.valor_total)}</td>
                             <td>${v.data}</td>
                             <td><button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button></td>

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from database import Session, Produto, Venda
+from database import Session, Produto, Venda, UNIDADES
 from datetime import datetime
 
 app = Flask(__name__)
@@ -30,6 +30,7 @@ def validar_produto(dados):
     ou (None, dados_limpos) se estiver tudo certo."""
     nome = str(dados.get('nome', '')).strip()
     categoria = str(dados.get('categoria', '')).strip()
+    unidade = str(dados.get('unidade', 'UN')).strip().upper() or 'UN'
 
     if not nome:
         return 'Digite o nome do produto.', None
@@ -58,15 +59,24 @@ def validar_produto(dados):
     if quantidade < 0:
         return 'A quantidade não pode ser negativa.', None
 
+    if unidade not in UNIDADES:
+        return 'Escolha uma unidade de medida da lista.', None
+
     return None, {
         'nome': nome.upper(),
         'preco': preco,
         'quantidade': quantidade,
-        'categoria': categoria.upper()
+        'categoria': categoria.upper(),
+        'unidade': unidade
     }
 
 
 # ---------- API DE PRODUTOS ----------
+
+@app.route('/api/unidades')
+def lista_unidades():
+    return jsonify(UNIDADES)
+
 
 @app.route('/api/produtos', methods=['GET', 'POST'])
 def produtos():
@@ -91,7 +101,8 @@ def produtos():
         'nome': p.nome,
         'preco': p.preco,
         'quantidade': p.quantidade,
-        'categoria': p.categoria
+        'categoria': p.categoria,
+        'unidade': p.unidade or 'UN'
     } for p in todos_produtos]
     session.close()
     return jsonify(resultado)
@@ -115,6 +126,7 @@ def editar_produto(id):
     produto.preco = limpos['preco']
     produto.quantidade = limpos['quantidade']
     produto.categoria = limpos['categoria']
+    produto.unidade = limpos['unidade']
     session.commit()
     session.close()
     return jsonify({'sucesso': True})
@@ -200,6 +212,7 @@ def vendas():
         resultado.append({
             'id': v.id,
             'produto': produto.nome if produto else '(produto excluído)',
+            'unidade': (produto.unidade if produto else None) or 'UN',
             'quantidade': v.quantidade,
             'valor_total': v.valor_total,
             'data': v.data.strftime('%d/%m/%Y %H:%M')
@@ -282,6 +295,7 @@ def finalizar_pedido():
         session.flush()
         ids.append(venda.id)
         comprovante.append({'produto': produto.nome, 'quantidade': quantidade,
+                            'unidade': produto.unidade or 'UN',
                             'preco': produto.preco, 'subtotal': subtotal})
         total += subtotal
 
@@ -310,6 +324,7 @@ def mais_vendidos():
             produto = session.query(Produto).filter_by(id=v.produto_id).first()
             resumo[v.produto_id] = {
                 'produto': produto.nome if produto else '(produto excluído)',
+                'unidade': (produto.unidade if produto else None) or 'UN',
                 'quantidade_vendida': 0,
                 'numero_vendas': 0,
                 'valor_vendido': 0.0

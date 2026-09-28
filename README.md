@@ -6,7 +6,7 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 ## ✅ O que o sistema faz
 
 ### 📦 Produtos
-1. **Cadastro de produtos**: nome, preço, quantidade e categoria.
+1. **Cadastro de produtos**: nome, preço, quantidade, categoria e **unidade de medida** (UN, SACO, M³, M², M, KG, MILHEIRO, LATA, CAIXA, BARRA, ROLO, LITRO).
 2. **Editar produtos**: corrige nome, preço, quantidade ou categoria de um produto já cadastrado.
 3. **Excluir produtos**, com confirmação antes de apagar.
 4. **+ Entrada (repor estoque)**: registra a chegada de mercadoria e soma ao estoque.
@@ -76,6 +76,7 @@ sistema-varejo-novo/
 - [x] Menu destacado
 - [x] Repor estoque, aviso de reposição, cancelar venda e tecla Enter
 - [x] Carrinho com vários produtos e comprovante para imprimir
+- [x] Unidade de medida nos produtos, no carrinho e no comprovante
 - [ ] Novas melhorias sugeridas pelo usuário
 
 ## 👤 Autor

@@ -24,16 +24,22 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 14. **Cancelar venda**: desfaz uma venda errada e devolve os produtos ao estoque.
 15. **Tecla Enter**: agiliza o cadastro e a venda sem precisar clicar nos botões.
 
+### 📄 Orçamentos
+16. **Gerar orçamento**: monte o carrinho, digite o nome do cliente, escolha a **data de validade** (campo obrigatório) e gere o orçamento para imprimir. O estoque **não muda**.
+17. **Tela de Orçamentos**: lista todos os orçamentos, com busca por cliente, telefone ou número.
+18. **Idade do orçamento**: mostra "hoje", "ontem" ou "há 5 dias", e a situação em cores: 🟢 Aberto, 🟠 Vencendo (5 dias ou mais, ou faltando 2 dias para vencer), ⚫ Vencido (passou da validade), 🔵 Virou venda, 🔴 Cancelado.
+19. **Transformar em venda**: coloca os itens do orçamento no carrinho, mantendo os preços combinados.
+
 ### 📊 Relatórios
-16. **Resumo do estoque**: total de produtos e valor total em estoque.
-17. **Produtos mais vendidos**: ranking com unidades, número de vendas e valor vendido.
+20. **Resumo do estoque**: total de produtos e valor total em estoque.
+21. **Produtos mais vendidos**: ranking com unidades, número de vendas e valor vendido.
 
 ### 🎨 Visual
-18. **Cores no estoque**:
+22. **Cores no estoque**:
     - 🟢 **Verde**: estoque bom (10 ou mais)
     - 🟡 **Amarelo**: estoque baixo (1 a 9)
     - 🔴 **Vermelho com bolinha**: sem estoque (0)
-19. **Menu laranja em destaque**, mostrando a tela atual.
+23. **Menu laranja em destaque**, mostrando a tela atual.
 
 ## 🛠️ Tecnologias usadas
 
@@ -51,6 +57,7 @@ sistema-varejo-novo/
 └── templates/
     ├── index.html      → tela de cadastro de produtos
     ├── vendas.html     → tela de vendas e histórico
+    ├── orcamentos.html → tela de orçamentos
     └── relatorios.html → tela de relatórios
 ```
 
@@ -77,6 +84,7 @@ sistema-varejo-novo/
 - [x] Repor estoque, aviso de reposição, cancelar venda e tecla Enter
 - [x] Carrinho com vários produtos e comprovante para imprimir
 - [x] Unidade de medida nos produtos, no carrinho e no comprovante
+- [x] Orçamentos com validade, busca e transformar em venda
 - [ ] Novas melhorias sugeridas pelo usuário
 
 ## 👤 Autor

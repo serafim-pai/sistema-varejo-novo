@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Orçamentos</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        input, button { padding: 8px; margin: 5px; }
+        table { border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 9px; text-align: left; vertical-align: top; }
+
+        /* Menu */
+        nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+        nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
+                letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+                padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
+        nav a:hover { background: #ff8a3d; }
+        nav a.ativo { background: #ffffff; color: #e65100; }
+
+        /* Busca e filtros */
+        #buscaCliente { width: 300px; }
+        .filtro { background: #eee; border: 1px solid #ccc; border-radius: 20px; cursor: pointer; }
+        .filtro.ativo { background: #e65100; color: #fff; border-color: #e65100; font-weight: bold; }
+
+        /* Situação (etiquetas coloridas) */
+        .etiqueta { padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 13px; white-space: nowrap; }
+        .sit-ABERTO { background: #d4edda; color: #155724; }
+        .sit-VENCENDO { background: #ffe0b2; color: #8a4b00; }
+        .sit-VENCIDO { background: #e0e0e0; color: #444; }
+        .sit-VIROU { background: #cfe2ff; color: #0a3a8a; }
+        .sit-CANCELADO { background: #f8d7da; color: #721c24; }
+        tr.linha-VENCENDO { background: #fff5e6; }
+
+        .idade { font-weight: bold; }
+        .resumo { color: #555; font-size: 13px; }
+
+        /* Botões */
+        .btn-venda { background: #28a745; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-ver { background: #1565c0; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-cancelar { background: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-imprimir { background: #1565c0; color: #fff; border: none; border-radius: 6px; font-weight: bold;
+                        font-size: 16px; padding: 10px 18px; cursor: pointer; }
+        .btn-fechar { background: #6c757d; color: #fff; border: none; border-radius: 6px; padding: 10px 16px; cursor: pointer; }
+
+        .legenda span { margin-right: 10px; }
+
+        /* Documento do orçamento */
+        #areaDocumento { display: none; margin: 15px 0; }
+        .comprovante { width: 320px; border: 1px dashed #333; padding: 15px; font-family: "Courier New", monospace;
+                       font-size: 14px; background: #fff; }
+        .comprovante h3 { text-align: center; margin: 0 0 5px; }
+        .comprovante .centro { text-align: center; }
+        .comprovante table { width: 100%; margin: 0; }
+        .comprovante th, .comprovante td { border: none; padding: 3px 0; font-size: 13px; }
+        .comprovante .direita { text-align: right; }
+        .comprovante hr { border: none; border-top: 1px dashed #333; }
+        .comprovante .total-cupom { font-size: 18px; font-weight: bold; text-align: right; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #documento, #documento * { visibility: visible; }
+            #documento { position: absolute; left: 0; top: 0; border: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Produtos</a>
+        <a href="/vendas">Vendas</a>
+        <a href="/orcamentos" class="ativo">Orçamentos</a>
+        <a href="/relatorios">Relatórios</a>
+    </nav>
+
+    <h1>📄 Orçamentos</h1>
+    <p>Para fazer um orçamento novo, vá em <a href="/vendas"><strong>Vendas</strong></a>, monte o carrinho,
+       digite o nome do cliente e clique em <strong>📄 Gerar orçamento</strong>.</p>
+
+    <!-- Busca e filtros -->
+    <input type="text" id="buscaCliente" placeholder="🔍 Buscar por cliente, telefone ou nº...">
+    <div>
+        <button class="filtro ativo" data-filtro="TODOS">Todos</button>
+        <button class="filtro" data-filtro="ABERTO">🟢 Abertos</button>
+        <button class="filtro" data-filtro="VENCENDO">🟠 Vencendo</button>
+        <button class="filtro" data-filtro="VENCIDO">⚫ Vencidos</button>
+        <button class="filtro" data-filtro="VIROU VENDA">🔵 Viraram venda</button>
+        <button class="filtro" data-filtro="CANCELADO">🔴 Cancelados</button>
+    </div>
+
+    <p class="legenda">
+        <span>🟢 <strong>Aberto</strong>: dentro da validade</span>
+        <span>🟠 <strong>Vencendo</strong>: feito há 5 dias ou mais, ou faltam 2 dias ou menos – ligue para o cliente!</span>
+        <span>⚫ <strong>Vencido</strong>: passou da data de validade</span>
+    </p>
+
+    <!-- Documento para ver/imprimir -->
+    <div id="areaDocumento">
+        <div id="documento" class="comprovante"></div>
+        <br>
+        <button class="btn-imprimir" onclick="window.print()">🖨 Imprimir</button>
+        <button class="btn-fechar" onclick="fecharDocumento()">Fechar</button>
+    </div>
+
+    <table id="tabelaOrcamentos"></table>
+
+    <script>
+        let listaOrcamentos = [];
+        let filtroAtual = 'TODOS';
+
+        function dinheiro(valor) {
+            return 'R$ ' + valor.toFixed(2);
+        }
+
+        // Texto da idade do orçamento: "hoje", "ontem", "há 5 dias"
+        function textoIdade(dias) {
+            if (dias === 0) return 'hoje';
+            if (dias === 1) return 'ontem';
+            return 'há ' + dias + ' dias';
+        }
+
+        function textoSituacao(o) {
+            switch (o.situacao) {
+                case 'ABERTO':
+                    return `<span class="etiqueta sit-ABERTO">🟢 ABERTO</span><br><small>vence em ${o.faltam} dia(s)</small>`;
+                case 'VENCENDO':
+                    return `<span class="etiqueta sit-VENCENDO">🟠 VENCENDO</span><br><small>${o.faltam === 0 ? 'vence HOJE' : 'vence em ' + o.faltam + ' dia(s)'}</small>`;
+                case 'VENCIDO':
+                    return `<span class="etiqueta sit-VENCIDO">⚫ VENCIDO</span><br><small>em ${o.valido_ate}</small>`;
+                case 'VIROU VENDA':
+                    return `<span class="etiqueta sit-VIROU">🔵 VIROU VENDA</span><br><small>venda nº ${o.venda_numero}</small>`;
+                case 'CANCELADO':
+                    return `<span class="etiqueta sit-CANCELADO">🔴 CANCELADO</span>`;
+            }
+            return o.situacao;
+        }
+
+        function carregarOrcamentos() {
+            fetch('/api/orcamentos')
+                .then(r => r.json())
+                .then(lista => {
+                    listaOrcamentos = lista;
+                    mostrarTabela();
+                });
+        }
+
+        function mostrarTabela() {
+            const busca = document.getElementById('buscaCliente').value.trim().toUpperCase();
+
+            const filtrados = listaOrcamentos.filter(o => {
+                if (filtroAtual !== 'TODOS' && o.situacao !== filtroAtual) return false;
+                if (!busca) return true;
+                return o.cliente.toUpperCase().includes(busca)
+                    || o.telefone.includes(busca)
+                    || String(o.id) === busca;
+            });
+
+            if (filtrados.length === 0) {
+                document.getElementById('tabelaOrcamentos').innerHTML =
+                    '<tr><td>Nenhum orçamento encontrado.</td></tr>';
+                return;
+            }
+
+            let html = '<tr><th>Nº</th><th>Feito em</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Situação</th><th>Ações</th></tr>';
+            filtrados.forEach(o => {
+                const resumo = o.itens.map(i => `${i.quantidade} ${i.unidade} ${i.produto}`).join('<br>');
+                const podeVender = o.situacao === 'ABERTO' || o.situacao === 'VENCENDO';
+                const podeCancelar = podeVender || o.situacao === 'VENCIDO';
+
+                html += `<tr class="linha-${o.situacao}">
+                    <td><strong>${o.id}</strong></td>
+                    <td>${o.data}<br><span class="idade">${textoIdade(o.dias)}</span></td>
+                    <td><strong>${o.cliente}</strong>${o.telefone ? '<br>📞 ' + o.telefone : ''}</td>
+                    <td class="resumo">${resumo}</td>
+                    <td><strong>${dinheiro(o.total)}</strong></td>
+                    <td>${textoSituacao(o)}</td>
+                    <td>
+                        <button class="btn-ver" onclick="verOrcamento(${o.id})">Ver / Imprimir</button><br>
+                        ${podeVender ? `<button class="btn-venda" onclick="transformarEmVenda(${o.id})">✔ Transformar em venda</button><br>` : ''}
+                        ${podeCancelar ? `<button class="btn-cancelar" onclick="cancelarOrcamento(${o.id})">Cancelar</button>` : ''}
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('tabelaOrcamentos').innerHTML = html;
+        }
+
+        function verOrcamento(id) {
+            const o = listaOrcamentos.find(item => item.id === id);
+            if (!o) return;
+            let linhas = '';
+            o.itens.forEach(item => {
+                linhas += `<tr>
+                    <td>${item.quantidade} ${item.unidade} - ${item.produto}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
+                    <td class="direita">${dinheiro(item.subtotal)}</td>
+                </tr>`;
+            });
+            document.getElementById('documento').innerHTML = `
+                <h3>🧱 LOJA DE MATERIAL DE CONSTRUÇÃO</h3>
+                <div class="centro"><strong>ORÇAMENTO Nº ${o.id}</strong></div>
+                <div class="centro"><small>(não é venda – sem valor fiscal)</small></div>
+                <hr>
+                <div>Cliente: ${o.cliente}</div>
+                ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
+                <div>Data: ${o.data}</div>
+                <div><strong>Válido até: ${o.valido_ate}</strong></div>
+                <hr>
+                <table>${linhas}</table>
+                <hr>
+                <div class="total-cupom">TOTAL: ${dinheiro(o.total)}</div>
+                <hr>
+                <div class="centro"><small>Preços garantidos até a data de validade,<br>sujeito à disponibilidade de estoque.</small></div>
+            `;
+            document.getElementById('areaDocumento').style.display = 'block';
+            window.scrollTo(0, 0);
+        }
+
+        function fecharDocumento() {
+            document.getElementById('areaDocumento').style.display = 'none';
+        }
+
+        // Leva para a tela de Vendas com os itens do orçamento já no carrinho
+        function transformarEmVenda(id) {
+            window.location.href = '/vendas?orcamento=' + id;
+        }
+
+        function cancelarOrcamento(id) {
+            if (!confirm(`Cancelar o orçamento nº ${id}?`)) return;
+            fetch('/api/orcamentos/' + id + '/cancelar', {method: 'POST'})
+                .then(r => r.json())
+                .then(res => {
+                    if (res.sucesso) carregarOrcamentos();
+                    else alert(res.mensagem);
+                });
+        }
+
+        // Busca: filtra enquanto digita
+        document.getElementById('buscaCliente').addEventListener('input', mostrarTabela);
+
+        // Botões de filtro
+        document.querySelectorAll('.filtro').forEach(botao => {
+            botao.addEventListener('click', () => {
+                document.querySelectorAll('.filtro').forEach(b => b.classList.remove('ativo'));
+                botao.classList.add('ativo');
+                filtroAtual = botao.dataset.filtro;
+                mostrarTabela();
+            });
+        });
+
+        carregarOrcamentos();
+    </script>
+</body>
+</html>

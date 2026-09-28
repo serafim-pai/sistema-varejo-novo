@@ -32,6 +32,32 @@ class Venda(Base):
     data = Column(DateTime, default=datetime.now)
 
 
+class Orcamento(Base):
+    """Orçamento: proposta de preço para o cliente. NÃO mexe no estoque."""
+    __tablename__ = 'orcamentos'
+
+    id = Column(Integer, primary_key=True)
+    cliente = Column(String(100), nullable=False)
+    telefone = Column(String(30), nullable=True)
+    data = Column(DateTime, default=datetime.now)
+    validade_dias = Column(Integer, nullable=False, default=7)
+    situacao = Column(String(20), nullable=False, default='ABERTO')   # ABERTO, VIROU VENDA, CANCELADO
+    venda_numero = Column(Integer, nullable=True)                      # nº da venda, quando virar venda
+
+
+class OrcamentoItem(Base):
+    """Cada produto de um orçamento, com o preço do dia em que foi feito."""
+    __tablename__ = 'orcamento_itens'
+
+    id = Column(Integer, primary_key=True)
+    orcamento_id = Column(Integer, nullable=False)
+    produto_id = Column(Integer, nullable=False)
+    produto_nome = Column(String(100), nullable=False)
+    unidade = Column(String(20), nullable=False, default='UN')
+    quantidade = Column(Integer, nullable=False)
+    preco = Column(Float, nullable=False)
+
+
 Base.metadata.create_all(engine)
 
 # Atualização do banco: se a tabela de produtos ainda não tem a coluna "unidade",

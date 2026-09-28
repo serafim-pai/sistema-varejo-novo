@@ -59,16 +59,28 @@
             #comprovante, #comprovante * { visibility: visible; }
             #comprovante { position: absolute; left: 0; top: 0; border: none; }
         }
+        .btn-orcamento { background: #6f42c1; color: #fff; border: none; border-radius: 6px; font-weight: bold;
+                         font-size: 18px; padding: 12px 22px; cursor: pointer; }
+        .cliente { background: #f3eefc; border: 1px solid #c9b6f0; border-radius: 6px; padding: 8px 10px; margin: 10px 0; }
+        .cliente label { font-weight: bold; margin-right: 5px; }
+        #bannerOrcamento { display: none; background: #f3eefc; border: 2px solid #6f42c1; color: #3d2270;
+                           border-radius: 6px; padding: 12px 16px; margin: 10px 0; font-size: 16px; }
+        .obrigatorio { color: #dc3545; font-weight: bold; }
+        .campo-erro { border: 2px solid #dc3545 !important; background: #fff0f0; }
     </style>
 </head>
 <body>
     <nav>
         <a href="/">Produtos</a>
         <a href="/vendas" class="ativo">Vendas</a>
+        <a href="/orcamentos">Orçamentos</a>
         <a href="/relatorios">Relatórios</a>
     </nav>
 
     <h1>Registrar Venda</h1>
+
+    <!-- Aparece quando a venda vem de um orçamento -->
+    <div id="bannerOrcamento"></div>
 
     <h2>1. Adicione os produtos</h2>
     <input type="text" id="busca" list="listaProdutos" placeholder="Digite o nome do produto..." autocomplete="off">
@@ -82,15 +94,24 @@
         <h2>🛒 2. Carrinho</h2>
         <div id="listaCarrinho"></div>
         <div class="total">TOTAL: <span id="totalCarrinho">R$ 0.00</span></div>
+        <div class="cliente">
+            <div><strong>Dados do orçamento</strong> <small>(campos com <span class="obrigatorio">*</span> são obrigatórios)</small></div>
+            <label>Cliente <span class="obrigatorio">*</span></label>
+            <input type="text" id="cliente" placeholder="Nome do cliente">
+            <input type="text" id="telefone" placeholder="Telefone (opcional)">
+            <label>Válido até <span class="obrigatorio">*</span></label>
+            <input type="date" id="validade" title="Data de validade do orçamento (obrigatório)">
+        </div>
         <button class="btn-finalizar" onclick="finalizarVenda()">✔ Finalizar venda</button>
+        <button class="btn-orcamento" onclick="gerarOrcamento()">📄 Gerar orçamento</button>
         <button class="btn-limpar" onclick="limparCarrinho()">Limpar carrinho</button>
     </div>
 
     <div id="areaComprovante">
-        <h2>🧾 3. Comprovante</h2>
+        <h2 id="tituloDocumento">🧾 3. Comprovante</h2>
         <div id="comprovante" class="comprovante"></div>
         <br>
-        <button class="btn-imprimir" onclick="window.print()">🖨 Imprimir comprovante</button>
+        <button class="btn-imprimir" onclick="window.print()">🖨 Imprimir</button>
         <button class="btn-limpar" onclick="novaVenda()">Nova venda</button>
     </div>
 
@@ -99,7 +120,8 @@
 
     <script>
         let listaProdutos = [];
-        let carrinho = [];   // cada item: {produto_id, nome, preco, quantidade}
+        let carrinho = [];   // cada item: {produto_id, nome, preco, unidade, quantidade}
+        let orcamentoAtual = null;   // preenchido quando a venda vem de um orçamento
 
         function dinheiro(valor) {
             return 'R$ ' + valor.toFixed(2);
@@ -187,6 +209,7 @@
         function limparCarrinho() {
             if (carrinho.length && !confirm('Tirar todos os itens do carrinho?')) return;
             carrinho = [];
+            desligarOrcamento();
             mostrarCarrinho();
             atualizarCaixaEstoque();
         }
@@ -227,11 +250,15 @@
             fetch('/api/pedidos', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({itens: carrinho.map(i => ({produto_id: i.produto_id, quantidade: i.quantidade}))})
+                body: JSON.stringify({
+                    itens: carrinho.map(i => ({produto_id: i.produto_id, quantidade: i.quantidade})),
+                    orcamento_id: orcamentoAtual ? orcamentoAtual.id : null
+                })
             }).then(r => r.json()).then(res => {
                 if (!res.sucesso) { alert(res.mensagem); return; }
                 mostrarComprovante(res);
                 carrinho = [];
+                desligarOrcamento();
                 mostrarCarrinho();
                 carregarProdutos();
                 carregarVendas();
@@ -250,6 +277,7 @@
             document.getElementById('comprovante').innerHTML = `
                 <h3>🧱 LOJA DE MATERIAL DE CONSTRUÇÃO</h3>
                 <div class="centro">COMPROVANTE DE VENDA</div>
+                ${orcamentoAtual ? `<div class="centro"><small>(referente ao orçamento nº ${orcamentoAtual.id})</small></div>` : ''}
                 <div class="centro"><small>(sem valor fiscal)</small></div>
                 <hr>
                 <div>Venda nº: ${res.numero}</div>
@@ -261,8 +289,128 @@
                 <hr>
                 <div class="centro">Obrigado pela preferência!</div>
             `;
+            document.getElementById('tituloDocumento').textContent = '🧾 3. Comprovante de venda';
             document.getElementById('areaComprovante').style.display = 'block';
             document.getElementById('areaComprovante').scrollIntoView({behavior: 'smooth'});
+        }
+
+        // ---------- Orçamento ----------
+
+        // Salva o carrinho como orçamento (NÃO mexe no estoque) e mostra para imprimir
+        function gerarOrcamento() {
+            if (carrinho.length === 0) { alert('O carrinho está vazio.'); return; }
+            const cliente = document.getElementById('cliente').value.trim();
+            const telefone = document.getElementById('telefone').value.trim();
+            const validade = document.getElementById('validade').value;
+
+            // Campos obrigatórios: Cliente e Válido até
+            document.getElementById('cliente').classList.toggle('campo-erro', !cliente);
+            document.getElementById('validade').classList.toggle('campo-erro', !validade);
+            if (!cliente) {
+                alert('Campo obrigatório: digite o nome do cliente.');
+                document.getElementById('cliente').focus();
+                return;
+            }
+            if (!validade) {
+                alert('Campo obrigatório: escolha a data de validade do orçamento.');
+                document.getElementById('validade').focus();
+                return;
+            }
+
+            fetch('/api/orcamentos', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    cliente, telefone, validade,
+                    itens: carrinho.map(i => ({produto_id: i.produto_id, quantidade: i.quantidade}))
+                })
+            }).then(r => r.json()).then(res => {
+                if (!res.sucesso) { alert(res.mensagem); return; }
+                mostrarDocumentoOrcamento(res.orcamento);
+                carrinho = [];
+                desligarOrcamento();
+                mostrarCarrinho();
+                atualizarCaixaEstoque();
+            });
+        }
+
+        function mostrarDocumentoOrcamento(o) {
+            let linhas = '';
+            o.itens.forEach(item => {
+                linhas += `<tr>
+                    <td>${item.quantidade} ${item.unidade} - ${item.produto}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
+                    <td class="direita">${dinheiro(item.subtotal)}</td>
+                </tr>`;
+            });
+            document.getElementById('comprovante').innerHTML = `
+                <h3>🧱 LOJA DE MATERIAL DE CONSTRUÇÃO</h3>
+                <div class="centro"><strong>ORÇAMENTO Nº ${o.id}</strong></div>
+                <div class="centro"><small>(não é venda – sem valor fiscal)</small></div>
+                <hr>
+                <div>Cliente: ${o.cliente}</div>
+                ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
+                <div>Data: ${o.data}</div>
+                <div><strong>Válido até: ${o.valido_ate}</strong></div>
+                <hr>
+                <table>${linhas}</table>
+                <hr>
+                <div class="total-cupom">TOTAL: ${dinheiro(o.total)}</div>
+                <hr>
+                <div class="centro"><small>Preços garantidos até a data de validade,<br>sujeito à disponibilidade de estoque.</small></div>
+            `;
+            document.getElementById('tituloDocumento').textContent = '📄 Orçamento nº ' + o.id + ' (guardado na tela Orçamentos)';
+            document.getElementById('areaComprovante').style.display = 'block';
+            document.getElementById('areaComprovante').scrollIntoView({behavior: 'smooth'});
+        }
+
+        // Quando a tela abre com ?orcamento=NUMERO, coloca os itens do orçamento no carrinho
+        function carregarOrcamentoDaUrl() {
+            const numero = new URLSearchParams(window.location.search).get('orcamento');
+            if (!numero) return;
+            fetch('/api/orcamentos/' + numero)
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.sucesso) { alert(res.mensagem); return; }
+                    const o = res.orcamento;
+                    if (o.situacao !== 'ABERTO' && o.situacao !== 'VENCENDO') {
+                        alert(`O orçamento nº ${o.id} não pode virar venda (situação: ${o.situacao}).`);
+                        return;
+                    }
+                    orcamentoAtual = o;
+                    carrinho = o.itens.map(i => ({produto_id: i.produto_id, nome: i.produto,
+                                                  preco: i.preco, unidade: i.unidade, quantidade: i.quantidade}));
+                    document.getElementById('cliente').value = o.cliente;
+                    document.getElementById('telefone').value = o.telefone;
+                    const banner = document.getElementById('bannerOrcamento');
+                    banner.innerHTML = `📄 <strong>Venda do orçamento nº ${o.id}</strong> – cliente <strong>${o.cliente}</strong>
+                        (feito em ${o.data}). Os preços do orçamento foram mantidos.
+                        <button class="btn-limpar" onclick="limparCarrinho()">Sair do orçamento</button>`;
+                    banner.style.display = 'block';
+                    mostrarCarrinho();
+                    atualizarCaixaEstoque();
+                });
+        }
+
+        // A validade começa em branco: o vendedor é obrigado a escolher.
+        // Também impede escolher uma data antes de hoje no calendário.
+        function validadePadrao() {
+            const d = new Date();
+            const mes = String(d.getMonth() + 1).padStart(2, '0');
+            const dia = String(d.getDate()).padStart(2, '0');
+            const campo = document.getElementById('validade');
+            campo.min = `${d.getFullYear()}-${mes}-${dia}`;
+            campo.value = '';
+            campo.classList.remove('campo-erro');
+            document.getElementById('cliente').classList.remove('campo-erro');
+        }
+
+        function desligarOrcamento() {
+            orcamentoAtual = null;
+            document.getElementById('bannerOrcamento').style.display = 'none';
+            document.getElementById('cliente').value = '';
+            document.getElementById('telefone').value = '';
+            validadePadrao();
+            if (window.location.search) history.replaceState(null, '', '/vendas');
         }
 
         function novaVenda() {
@@ -324,6 +472,14 @@
         mostrarCarrinho();
         carregarProdutos();
         carregarVendas();
+        ['cliente', 'validade'].forEach(id => {
+            document.getElementById(id).addEventListener('input', e => {
+                if (e.target.value) e.target.classList.remove('campo-erro');
+            });
+        });
+
+        validadePadrao();
+        carregarOrcamentoDaUrl();
     </script>
 </body>
 </html>

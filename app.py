@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
-from database import Session, Produto, Venda, UNIDADES
-from datetime import datetime
+from database import Session, Produto, Venda, Orcamento, OrcamentoItem, UNIDADES
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -20,6 +20,11 @@ def pagina_vendas():
 @app.route('/relatorios')
 def pagina_relatorios():
     return render_template('relatorios.html')
+
+
+@app.route('/orcamentos')
+def pagina_orcamentos():
+    return render_template('orcamentos.html')
 
 
 # ---------- VALIDAÇÃO (usada no cadastro e na edição) ----------
@@ -247,6 +252,7 @@ def finalizar_pedido():
     dá baixa em tudo de uma vez e devolve os dados do comprovante."""
     session = Session()
     itens = (request.json or {}).get('itens', [])
+    orcamento_id = (request.json or {}).get('orcamento_id')
 
     if not itens:
         session.close()
@@ -277,8 +283,24 @@ def finalizar_pedido():
             nome, disponivel = produto.nome, produto.quantidade
             session.close()
             return jsonify({'sucesso': False,
-                            'mensagem': f'Estoque insuficiente de {nome}: tem só {disponivel} un.'})
+                            'mensagem': f'Estoque insuficiente de {nome}: tem só {disponivel}.'})
         produtos[produto_id] = produto
+
+    # Se a venda veio de um orçamento, usa os preços combinados no orçamento
+    orcamento = None
+    precos_orcamento = {}
+    if orcamento_id:
+        orcamento = session.query(Orcamento).filter_by(id=int(orcamento_id)).first()
+        if not orcamento:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Orçamento não encontrado.'})
+        situacao, _, _ = situacao_orcamento(orcamento)
+        if situacao != 'ABERTO' and situacao != 'VENCENDO':
+            session.close()
+            return jsonify({'sucesso': False,
+                            'mensagem': f'Este orçamento não pode virar venda (situação: {situacao}).'})
+        for item in session.query(OrcamentoItem).filter_by(orcamento_id=orcamento.id).all():
+            precos_orcamento[item.produto_id] = item.preco
 
     # 2) Tudo certo: dá baixa no estoque e registra as vendas
     agora = datetime.now()
@@ -287,7 +309,8 @@ def finalizar_pedido():
     ids = []
     for produto_id, quantidade in quantidades.items():
         produto = produtos[produto_id]
-        subtotal = quantidade * produto.preco
+        preco = precos_orcamento.get(produto_id, produto.preco)
+        subtotal = quantidade * preco
         produto.quantidade -= quantidade
         venda = Venda(produto_id=produto_id, quantidade=quantidade,
                       valor_total=subtotal, data=agora)
@@ -296,8 +319,12 @@ def finalizar_pedido():
         ids.append(venda.id)
         comprovante.append({'produto': produto.nome, 'quantidade': quantidade,
                             'unidade': produto.unidade or 'UN',
-                            'preco': produto.preco, 'subtotal': subtotal})
+                            'preco': preco, 'subtotal': subtotal})
         total += subtotal
+
+    if orcamento:
+        orcamento.situacao = 'VIROU VENDA'
+        orcamento.venda_numero = min(ids)
 
     session.commit()
     session.close()
@@ -308,6 +335,135 @@ def finalizar_pedido():
         'itens': comprovante,
         'total': total
     })
+
+
+# ---------- ORÇAMENTOS ----------
+
+def situacao_orcamento(orcamento):
+    """Calcula a situação do orçamento pela idade dele.
+    Devolve (situacao, dias_desde_que_foi_feito, dias_que_faltam_para_vencer)."""
+    dias = (datetime.now().date() - orcamento.data.date()).days
+    faltam = orcamento.validade_dias - dias
+    if orcamento.situacao in ('VIROU VENDA', 'CANCELADO'):
+        return orcamento.situacao, dias, faltam
+    if faltam < 0:
+        return 'VENCIDO', dias, faltam
+    if dias >= 5 or faltam <= 2:
+        return 'VENCENDO', dias, faltam
+    return 'ABERTO', dias, faltam
+
+
+def orcamento_para_json(session, orcamento):
+    itens = session.query(OrcamentoItem).filter_by(orcamento_id=orcamento.id).all()
+    situacao, dias, faltam = situacao_orcamento(orcamento)
+    lista = [{'produto_id': i.produto_id, 'produto': i.produto_nome, 'unidade': i.unidade,
+              'quantidade': i.quantidade, 'preco': i.preco, 'subtotal': i.quantidade * i.preco}
+             for i in itens]
+    return {
+        'id': orcamento.id,
+        'cliente': orcamento.cliente,
+        'telefone': orcamento.telefone or '',
+        'data': orcamento.data.strftime('%d/%m/%Y %H:%M'),
+        'validade_dias': orcamento.validade_dias,
+        'valido_ate': (orcamento.data + timedelta(days=orcamento.validade_dias)).strftime('%d/%m/%Y'),
+        'dias': dias,
+        'faltam': faltam,
+        'situacao': situacao,
+        'venda_numero': orcamento.venda_numero,
+        'itens': lista,
+        'total': sum(i['subtotal'] for i in lista)
+    }
+
+
+@app.route('/api/orcamentos', methods=['GET', 'POST'])
+def orcamentos():
+    session = Session()
+
+    # Criar um orçamento novo (NÃO mexe no estoque)
+    if request.method == 'POST':
+        dados = request.json or {}
+        cliente = str(dados.get('cliente', '')).strip().upper()
+        telefone = str(dados.get('telefone', '')).strip()
+        itens = dados.get('itens', [])
+
+        # Data de validade escolhida pelo vendedor (formato AAAA-MM-DD)
+        try:
+            validade = datetime.strptime(str(dados.get('validade', '')), '%Y-%m-%d').date()
+        except ValueError:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Escolha a data de validade do orçamento.'})
+        validade_dias = (validade - datetime.now().date()).days
+        if validade_dias < 0:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'A data de validade não pode ser antes de hoje.'})
+
+        if sum(1 for letra in cliente if letra.isalpha()) < 2:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Digite o nome do cliente.'})
+        if not itens:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'O carrinho está vazio.'})
+
+        orcamento = Orcamento(cliente=cliente, telefone=telefone, data=datetime.now(),
+                              validade_dias=validade_dias)
+        session.add(orcamento)
+        session.flush()
+
+        for item in itens:
+            try:
+                produto_id = int(item['produto_id'])
+                quantidade = int(item['quantidade'])
+            except (KeyError, TypeError, ValueError):
+                session.rollback()
+                session.close()
+                return jsonify({'sucesso': False, 'mensagem': 'Item inválido no carrinho.'})
+            produto = session.query(Produto).filter_by(id=produto_id).first()
+            if not produto or quantidade <= 0:
+                session.rollback()
+                session.close()
+                return jsonify({'sucesso': False, 'mensagem': 'Item inválido no carrinho.'})
+            session.add(OrcamentoItem(orcamento_id=orcamento.id, produto_id=produto.id,
+                                      produto_nome=produto.nome, unidade=produto.unidade or 'UN',
+                                      quantidade=quantidade, preco=produto.preco))
+
+        session.commit()
+        resultado = orcamento_para_json(session, orcamento)
+        session.close()
+        return jsonify({'sucesso': True, 'orcamento': resultado})
+
+    # Listar todos os orçamentos (do mais novo para o mais antigo)
+    todos = session.query(Orcamento).order_by(Orcamento.id.desc()).all()
+    resultado = [orcamento_para_json(session, o) for o in todos]
+    session.close()
+    return jsonify(resultado)
+
+
+@app.route('/api/orcamentos/<int:id>')
+def ver_orcamento(id):
+    session = Session()
+    orcamento = session.query(Orcamento).filter_by(id=id).first()
+    if not orcamento:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Orçamento não encontrado.'})
+    resultado = orcamento_para_json(session, orcamento)
+    session.close()
+    return jsonify({'sucesso': True, 'orcamento': resultado})
+
+
+@app.route('/api/orcamentos/<int:id>/cancelar', methods=['POST'])
+def cancelar_orcamento(id):
+    session = Session()
+    orcamento = session.query(Orcamento).filter_by(id=id).first()
+    if not orcamento:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Orçamento não encontrado.'})
+    if orcamento.situacao == 'VIROU VENDA':
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Este orçamento já virou venda.'})
+    orcamento.situacao = 'CANCELADO'
+    session.commit()
+    session.close()
+    return jsonify({'sucesso': True})
 
 
 # ---------- RELATÓRIO: PRODUTOS MAIS VENDIDOS ----------

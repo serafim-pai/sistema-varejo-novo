@@ -14,24 +14,26 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 6. **Validações**: não aceita nome ou categoria vazios ou com menos de 2 letras, preço zero ou negativo, nem quantidade negativa.
 
 ### 🛒 Vendas
-7. **Busca por digitação**: digite parte do nome (ex.: "cim") e escolha o produto na lista.
-8. **Caixa de estoque**: ao escolher o produto, uma caixa ao lado mostra quanto ainda tem em estoque.
-9. **Baixa automática**: o estoque diminui sozinho a cada venda.
-10. **Proteção**: não deixa vender mais do que existe no estoque.
-11. **Histórico de vendas**: mostra o que foi vendido, a quantidade, o valor e a data.
-12. **Cancelar venda**: desfaz uma venda errada e devolve os produtos ao estoque.
-13. **Tecla Enter**: agiliza o cadastro e a venda sem precisar clicar nos botões.
+7. **Carrinho de compras**: adicione vários produtos (ex.: 2 AREIA + 5 CIMENTO + 1 BRITA), veja o total e finalize tudo de uma vez.
+8. **Comprovante para imprimir**: após finalizar, mostra o comprovante com itens, preços e total, pronto para imprimir.
+9. **Busca por digitação**: digite parte do nome (ex.: "cim") e escolha o produto na lista.
+10. **Caixa de estoque**: ao escolher o produto, uma caixa ao lado mostra quanto ainda tem em estoque.
+11. **Baixa automática**: o estoque diminui sozinho a cada venda.
+12. **Proteção**: não deixa vender mais do que existe no estoque.
+13. **Histórico de vendas**: mostra o que foi vendido, a quantidade, o valor e a data.
+14. **Cancelar venda**: desfaz uma venda errada e devolve os produtos ao estoque.
+15. **Tecla Enter**: agiliza o cadastro e a venda sem precisar clicar nos botões.
 
 ### 📊 Relatórios
-14. **Resumo do estoque**: total de produtos e valor total em estoque.
-15. **Produtos mais vendidos**: ranking com unidades, número de vendas e valor vendido.
+16. **Resumo do estoque**: total de produtos e valor total em estoque.
+17. **Produtos mais vendidos**: ranking com unidades, número de vendas e valor vendido.
 
 ### 🎨 Visual
-16. **Cores no estoque**:
+18. **Cores no estoque**:
     - 🟢 **Verde**: estoque bom (10 ou mais)
     - 🟡 **Amarelo**: estoque baixo (1 a 9)
     - 🔴 **Vermelho com bolinha**: sem estoque (0)
-17. **Menu laranja em destaque**, mostrando a tela atual.
+19. **Menu laranja em destaque**, mostrando a tela atual.
 
 ## 🛠️ Tecnologias usadas
 
@@ -73,6 +75,7 @@ sistema-varejo-novo/
 - [x] Cores e bolinha vermelha no estoque
 - [x] Menu destacado
 - [x] Repor estoque, aviso de reposição, cancelar venda e tecla Enter
+- [x] Carrinho com vários produtos e comprovante para imprimir
 - [ ] Novas melhorias sugeridas pelo usuário
 
 ## 👤 Autor

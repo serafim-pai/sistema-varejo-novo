@@ -228,6 +228,74 @@ def cancelar_venda(id):
     return jsonify({'sucesso': True})
 
 
+@app.route('/api/pedidos', methods=['POST'])
+def finalizar_pedido():
+    """Venda com vários itens (carrinho): confere o estoque de todos,
+    dá baixa em tudo de uma vez e devolve os dados do comprovante."""
+    session = Session()
+    itens = (request.json or {}).get('itens', [])
+
+    if not itens:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'O carrinho está vazio.'})
+
+    # Junta itens repetidos do mesmo produto
+    quantidades = {}
+    for item in itens:
+        try:
+            produto_id = int(item['produto_id'])
+            quantidade = int(item['quantidade'])
+        except (KeyError, TypeError, ValueError):
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Item inválido no carrinho.'})
+        if quantidade <= 0:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Quantidade inválida no carrinho.'})
+        quantidades[produto_id] = quantidades.get(produto_id, 0) + quantidade
+
+    # 1) Confere o estoque de TODOS os itens antes de vender
+    produtos = {}
+    for produto_id, quantidade in quantidades.items():
+        produto = session.query(Produto).filter_by(id=produto_id).first()
+        if not produto:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Produto não encontrado.'})
+        if produto.quantidade < quantidade:
+            nome, disponivel = produto.nome, produto.quantidade
+            session.close()
+            return jsonify({'sucesso': False,
+                            'mensagem': f'Estoque insuficiente de {nome}: tem só {disponivel} un.'})
+        produtos[produto_id] = produto
+
+    # 2) Tudo certo: dá baixa no estoque e registra as vendas
+    agora = datetime.now()
+    comprovante = []
+    total = 0.0
+    ids = []
+    for produto_id, quantidade in quantidades.items():
+        produto = produtos[produto_id]
+        subtotal = quantidade * produto.preco
+        produto.quantidade -= quantidade
+        venda = Venda(produto_id=produto_id, quantidade=quantidade,
+                      valor_total=subtotal, data=agora)
+        session.add(venda)
+        session.flush()
+        ids.append(venda.id)
+        comprovante.append({'produto': produto.nome, 'quantidade': quantidade,
+                            'preco': produto.preco, 'subtotal': subtotal})
+        total += subtotal
+
+    session.commit()
+    session.close()
+    return jsonify({
+        'sucesso': True,
+        'numero': min(ids),
+        'data': agora.strftime('%d/%m/%Y %H:%M'),
+        'itens': comprovante,
+        'total': total
+    })
+
+
 # ---------- RELATÓRIO: PRODUTOS MAIS VENDIDOS ----------
 
 @app.route('/api/relatorios/mais-vendidos')

@@ -7,21 +7,58 @@
         body { font-family: Arial; margin: 20px; }
         input, button, select { padding: 8px; margin: 5px; }
         #busca { width: 280px; }
-        table { border-collapse: collapse; margin-top: 20px; }
+        table { border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         .dica { color: #666; font-size: 14px; margin-left: 5px; }
-        #caixaEstoque { display: inline-block; min-width: 150px; padding: 8px 12px; margin: 5px;
-                        border: 2px solid #ccc; border-radius: 5px; font-weight: bold; background: #f5f5f5; color: #666; }
-        #caixaEstoque.estoque-ok { background: #d4edda; color: #155724; border-color: #28a745; }
-        #caixaEstoque.estoque-baixo { background: #fff3cd; color: #856404; border-color: #ffc107; }
-        #caixaEstoque.estoque-zerado { background: #f8d7da; color: #721c24; border-color: #dc3545; }
+
+        /* Menu */
         nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
         nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
                 letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
                 padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
         nav a:hover { background: #ff8a3d; }
         nav a.ativo { background: #ffffff; color: #e65100; }
-        .btn-cancelar { background: #dc3545; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+
+        /* Caixa de estoque */
+        #caixaEstoque { display: inline-block; min-width: 150px; padding: 8px 12px; margin: 5px;
+                        border: 2px solid #ccc; border-radius: 5px; font-weight: bold; background: #f5f5f5; color: #666; }
+        #caixaEstoque.estoque-ok { background: #d4edda; color: #155724; border-color: #28a745; }
+        #caixaEstoque.estoque-baixo { background: #fff3cd; color: #856404; border-color: #ffc107; }
+        #caixaEstoque.estoque-zerado { background: #f8d7da; color: #721c24; border-color: #dc3545; }
+
+        /* Botões */
+        .btn-adicionar { background: #1565c0; color: #fff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-finalizar { background: #28a745; color: #fff; border: none; border-radius: 6px; font-weight: bold;
+                         font-size: 18px; padding: 12px 22px; cursor: pointer; }
+        .btn-limpar { background: #6c757d; color: #fff; border: none; border-radius: 6px; padding: 12px 18px; cursor: pointer; }
+        .btn-cancelar, .btn-remover { background: #dc3545; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-imprimir { background: #1565c0; color: #fff; border: none; border-radius: 6px; font-weight: bold;
+                        font-size: 18px; padding: 12px 22px; cursor: pointer; }
+
+        /* Carrinho */
+        .carrinho { background: #fafafa; border: 2px solid #e65100; border-radius: 8px; padding: 15px; margin: 15px 0; max-width: 750px; }
+        .carrinho h2 { margin-top: 0; }
+        .total { font-size: 24px; font-weight: bold; color: #e65100; margin: 12px 0; }
+        .vazio { color: #888; font-style: italic; }
+
+        /* Comprovante */
+        #areaComprovante { display: none; margin: 15px 0; }
+        .comprovante { width: 320px; border: 1px dashed #333; padding: 15px; font-family: "Courier New", monospace;
+                       font-size: 14px; background: #fff; }
+        .comprovante h3 { text-align: center; margin: 0 0 5px; }
+        .comprovante .centro { text-align: center; }
+        .comprovante table { width: 100%; margin: 0; }
+        .comprovante th, .comprovante td { border: none; padding: 3px 0; font-size: 13px; }
+        .comprovante .direita { text-align: right; }
+        .comprovante hr { border: none; border-top: 1px dashed #333; }
+        .comprovante .total-cupom { font-size: 18px; font-weight: bold; text-align: right; }
+
+        /* Na impressão, só o comprovante aparece */
+        @media print {
+            body * { visibility: hidden; }
+            #comprovante, #comprovante * { visibility: visible; }
+            #comprovante { position: absolute; left: 0; top: 0; border: none; }
+        }
     </style>
 </head>
 <body>
@@ -33,44 +70,42 @@
 
     <h1>Registrar Venda</h1>
 
-    <h2>Nova Venda</h2>
-    <!-- Campo de busca: digite parte do nome e escolha na lista -->
+    <h2>1. Adicione os produtos</h2>
     <input type="text" id="busca" list="listaProdutos" placeholder="Digite o nome do produto..." autocomplete="off">
     <datalist id="listaProdutos"></datalist>
     <span id="caixaEstoque">Estoque: —</span>
     <input type="number" id="quantidade" placeholder="Quantidade">
-    <button onclick="registrarVenda()">Vender</button>
-    <div class="dica">Dica: digite parte do nome (ex.: "cim") e clique no produto que aparecer.</div>
+    <button class="btn-adicionar" onclick="adicionarAoCarrinho()">+ Adicionar</button>
+    <div class="dica">Dica: digite parte do nome (ex.: "cim"), escolha o produto, digite a quantidade e aperte Enter.</div>
+
+    <div class="carrinho">
+        <h2>🛒 2. Carrinho</h2>
+        <div id="listaCarrinho"></div>
+        <div class="total">TOTAL: <span id="totalCarrinho">R$ 0.00</span></div>
+        <button class="btn-finalizar" onclick="finalizarVenda()">✔ Finalizar venda</button>
+        <button class="btn-limpar" onclick="limparCarrinho()">Limpar carrinho</button>
+    </div>
+
+    <div id="areaComprovante">
+        <h2>🧾 3. Comprovante</h2>
+        <div id="comprovante" class="comprovante"></div>
+        <br>
+        <button class="btn-imprimir" onclick="window.print()">🖨 Imprimir comprovante</button>
+        <button class="btn-limpar" onclick="novaVenda()">Nova venda</button>
+    </div>
 
     <h2>Histórico de Vendas</h2>
     <table id="tabelaVendas"></table>
 
     <script>
         let listaProdutos = [];
+        let carrinho = [];   // cada item: {produto_id, nome, preco, quantidade}
 
-        // Texto que aparece na lista para cada produto (só o nome)
-        function textoDoProduto(p) {
-            return p.nome;
+        function dinheiro(valor) {
+            return 'R$ ' + valor.toFixed(2);
         }
 
-        // Mostra o estoque do produto escolhido na caixa ao lado
-        function atualizarCaixaEstoque() {
-            const caixa = document.getElementById('caixaEstoque');
-            const p = produtoEscolhido();
-            caixa.className = '';
-            if (!p) {
-                caixa.textContent = 'Estoque: —';
-                return;
-            }
-            caixa.textContent = p.quantidade <= 0
-                ? '🔴 Estoque: 0 (SEM ESTOQUE)'
-                : 'Estoque: ' + p.quantidade + ' un.';
-            if (p.quantidade <= 0) caixa.className = 'estoque-zerado';
-            else if (p.quantidade < 10) caixa.className = 'estoque-baixo';
-            else caixa.className = 'estoque-ok';
-        }
-
-        document.getElementById('busca').addEventListener('input', atualizarCaixaEstoque);
+        // ---------- Produtos e busca ----------
 
         function carregarProdutos() {
             fetch('/api/produtos')
@@ -78,9 +113,7 @@
                 .then(produtos => {
                     listaProdutos = produtos;
                     let opcoes = '';
-                    produtos.forEach(p => {
-                        opcoes += `<option value="${textoDoProduto(p)}"></option>`;
-                    });
+                    produtos.forEach(p => { opcoes += `<option value="${p.nome}"></option>`; });
                     document.getElementById('listaProdutos').innerHTML = opcoes;
                     atualizarCaixaEstoque();
                 });
@@ -90,21 +123,155 @@
         function produtoEscolhido() {
             const texto = document.getElementById('busca').value.trim().toUpperCase();
             if (!texto) return null;
-
-            // 1) Escolheu da lista (texto igual ao da opção)
-            let p = listaProdutos.find(item => textoDoProduto(item).toUpperCase() === texto);
+            let p = listaProdutos.find(item => item.nome.toUpperCase() === texto);
             if (p) return p;
-
-            // 2) Digitou o nome completo
-            p = listaProdutos.find(item => item.nome.toUpperCase() === texto);
-            if (p) return p;
-
-            // 3) Digitou só um pedaço e existe um único produto com ele
             const parecidos = listaProdutos.filter(item => item.nome.toUpperCase().includes(texto));
             if (parecidos.length === 1) return parecidos[0];
-
             return null;
         }
+
+        // Quanto desse produto já está no carrinho
+        function noCarrinho(produto_id) {
+            const item = carrinho.find(i => i.produto_id === produto_id);
+            return item ? item.quantidade : 0;
+        }
+
+        // Mostra o estoque disponível (descontando o que já está no carrinho)
+        function atualizarCaixaEstoque() {
+            const caixa = document.getElementById('caixaEstoque');
+            const p = produtoEscolhido();
+            caixa.className = '';
+            if (!p) { caixa.textContent = 'Estoque: —'; return; }
+
+            const disponivel = p.quantidade - noCarrinho(p.id);
+            caixa.textContent = disponivel <= 0
+                ? '🔴 Estoque: 0 (SEM ESTOQUE)'
+                : 'Estoque: ' + disponivel + ' un.';
+            if (disponivel <= 0) caixa.className = 'estoque-zerado';
+            else if (disponivel < 10) caixa.className = 'estoque-baixo';
+            else caixa.className = 'estoque-ok';
+        }
+
+        // ---------- Carrinho ----------
+
+        function adicionarAoCarrinho() {
+            const p = produtoEscolhido();
+            const quantidade = parseInt(document.getElementById('quantidade').value);
+
+            if (!p) { alert('Produto não encontrado. Digite o nome e escolha um produto da lista.'); return; }
+            if (!quantidade || quantidade <= 0) { alert('Digite uma quantidade maior que zero.'); return; }
+
+            const disponivel = p.quantidade - noCarrinho(p.id);
+            if (quantidade > disponivel) {
+                alert(`Estoque insuficiente de ${p.nome}. Disponível: ${disponivel} un.`);
+                return;
+            }
+
+            const item = carrinho.find(i => i.produto_id === p.id);
+            if (item) item.quantidade += quantidade;
+            else carrinho.push({produto_id: p.id, nome: p.nome, preco: p.preco, quantidade});
+
+            document.getElementById('busca').value = '';
+            document.getElementById('quantidade').value = '';
+            mostrarCarrinho();
+            atualizarCaixaEstoque();
+            document.getElementById('busca').focus();
+        }
+
+        function removerDoCarrinho(indice) {
+            carrinho.splice(indice, 1);
+            mostrarCarrinho();
+            atualizarCaixaEstoque();
+        }
+
+        function limparCarrinho() {
+            if (carrinho.length && !confirm('Tirar todos os itens do carrinho?')) return;
+            carrinho = [];
+            mostrarCarrinho();
+            atualizarCaixaEstoque();
+        }
+
+        function mostrarCarrinho() {
+            const area = document.getElementById('listaCarrinho');
+            let total = 0;
+
+            if (carrinho.length === 0) {
+                area.innerHTML = '<p class="vazio">O carrinho está vazio. Adicione os produtos acima.</p>';
+                document.getElementById('totalCarrinho').textContent = dinheiro(0);
+                return;
+            }
+
+            let html = '<table><tr><th>Produto</th><th>Qtd</th><th>Preço un.</th><th>Subtotal</th><th></th></tr>';
+            carrinho.forEach((item, i) => {
+                const subtotal = item.quantidade * item.preco;
+                total += subtotal;
+                html += `<tr>
+                    <td>${item.nome}</td>
+                    <td>${item.quantidade}</td>
+                    <td>${dinheiro(item.preco)}</td>
+                    <td>${dinheiro(subtotal)}</td>
+                    <td><button class="btn-remover" onclick="removerDoCarrinho(${i})">Remover</button></td>
+                </tr>`;
+            });
+            html += '</table>';
+            area.innerHTML = html;
+            document.getElementById('totalCarrinho').textContent = dinheiro(total);
+        }
+
+        // ---------- Finalizar e comprovante ----------
+
+        function finalizarVenda() {
+            if (carrinho.length === 0) { alert('O carrinho está vazio.'); return; }
+            if (!confirm('Finalizar a venda?')) return;
+
+            fetch('/api/pedidos', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({itens: carrinho.map(i => ({produto_id: i.produto_id, quantidade: i.quantidade}))})
+            }).then(r => r.json()).then(res => {
+                if (!res.sucesso) { alert(res.mensagem); return; }
+                mostrarComprovante(res);
+                carrinho = [];
+                mostrarCarrinho();
+                carregarProdutos();
+                carregarVendas();
+            });
+        }
+
+        function mostrarComprovante(res) {
+            let linhas = '';
+            res.itens.forEach(item => {
+                linhas += `<tr>
+                    <td>${item.quantidade} x ${item.produto}<br><small>${dinheiro(item.preco)} cada</small></td>
+                    <td class="direita">${dinheiro(item.subtotal)}</td>
+                </tr>`;
+            });
+
+            document.getElementById('comprovante').innerHTML = `
+                <h3>🧱 LOJA DE MATERIAL DE CONSTRUÇÃO</h3>
+                <div class="centro">COMPROVANTE DE VENDA</div>
+                <div class="centro"><small>(sem valor fiscal)</small></div>
+                <hr>
+                <div>Venda nº: ${res.numero}</div>
+                <div>Data: ${res.data}</div>
+                <hr>
+                <table>${linhas}</table>
+                <hr>
+                <div class="total-cupom">TOTAL: ${dinheiro(res.total)}</div>
+                <hr>
+                <div class="centro">Obrigado pela preferência!</div>
+            `;
+            document.getElementById('areaComprovante').style.display = 'block';
+            document.getElementById('areaComprovante').scrollIntoView({behavior: 'smooth'});
+        }
+
+        function novaVenda() {
+            document.getElementById('areaComprovante').style.display = 'none';
+            window.scrollTo(0, 0);
+            document.getElementById('busca').focus();
+        }
+
+        // ---------- Histórico ----------
 
         function carregarVendas() {
             fetch('/api/vendas')
@@ -116,7 +283,7 @@
                             <td>${v.id}</td>
                             <td>${v.produto}</td>
                             <td>${v.quantidade}</td>
-                            <td>R$ ${v.valor_total.toFixed(2)}</td>
+                            <td>${dinheiro(v.valor_total)}</td>
                             <td>${v.data}</td>
                             <td><button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button></td>
                         </tr>`;
@@ -125,41 +292,9 @@
                 });
         }
 
-        function registrarVenda() {
-            const produto = produtoEscolhido();
-            const quantidade = parseInt(document.getElementById('quantidade').value);
-
-            if (!produto) {
-                alert('Produto não encontrado. Digite o nome e escolha um produto da lista.');
-                return;
-            }
-            if (!quantidade) {
-                alert('Digite a quantidade.');
-                return;
-            }
-
-            fetch('/api/vendas', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({produto_id: produto.id, quantidade})
-            }).then(r => r.json()).then(res => {
-                if (res.sucesso) {
-                    alert('Venda registrada: ' + quantidade + ' x ' + produto.nome);
-                    document.getElementById('busca').value = '';
-                    document.getElementById('quantidade').value = '';
-                    carregarProdutos();
-                    carregarVendas();
-                    document.getElementById('busca').focus();
-                } else {
-                    alert(res.mensagem);
-                }
-            });
-        }
-
         // Cancelar uma venda: devolve os produtos ao estoque
         function cancelarVenda(id, produto, quantidade) {
             if (!confirm(`Cancelar a venda nº ${id}?\n\n${quantidade} x ${produto} vão VOLTAR para o estoque.`)) return;
-
             fetch('/api/vendas/' + id, {method: 'DELETE'})
                 .then(r => r.json())
                 .then(res => {
@@ -173,7 +308,9 @@
                 });
         }
 
-        // Tecla Enter: no campo do produto pula para a quantidade; na quantidade, vende
+        // ---------- Teclado ----------
+
+        document.getElementById('busca').addEventListener('input', atualizarCaixaEstoque);
         document.getElementById('busca').addEventListener('keydown', evento => {
             if (evento.key === 'Enter') {
                 evento.preventDefault();
@@ -181,9 +318,10 @@
             }
         });
         document.getElementById('quantidade').addEventListener('keydown', evento => {
-            if (evento.key === 'Enter') registrarVenda();
+            if (evento.key === 'Enter') adicionarAoCarrinho();
         });
 
+        mostrarCarrinho();
         carregarProdutos();
         carregarVendas();
     </script>

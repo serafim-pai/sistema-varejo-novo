@@ -1,0 +1,10 @@
+# Arquivos temporários do Python
+__pycache__/
+*.pyc
+
+# Banco de dados local (cada computador tem o seu)
+*.db
+
+# Ambiente virtual
+venv/
+.venv/

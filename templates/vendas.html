@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Registrar Venda</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        nav a { margin-right: 15px; }
+        input, button, select { padding: 8px; margin: 5px; }
+        table { border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/">Produtos</a>
+        <a href="/vendas">Vendas</a>
+        <a href="/relatorios">Relatórios</a>
+    </nav>
+
+    <h1>Registrar Venda</h1>
+
+    <h2>Nova Venda</h2>
+    <select id="produto_id">
+        <option value="">Selecionar Produto</option>
+    </select>
+    <input type="number" id="quantidade" placeholder="Quantidade">
+    <button onclick="registrarVenda()">Vender</button>
+
+    <h2>Histórico de Vendas</h2>
+    <table id="tabelaVendas"></table>
+
+    <script>
+        function carregarProdutos() {
+            fetch('/api/produtos')
+                .then(r => r.json())
+                .then(produtos => {
+                    let opcoes = '<option value="">Selecionar Produto</option>';
+                    produtos.forEach(p => {
+                        opcoes += `<option value="${p.id}">${p.nome} (estoque: ${p.quantidade})</option>`;
+                    });
+                    document.getElementById('produto_id').innerHTML = opcoes;
+                });
+        }
+
+        function carregarVendas() {
+            fetch('/api/vendas')
+                .then(r => r.json())
+                .then(vendas => {
+                    let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Data</th></tr>';
+                    vendas.forEach(v => {
+                        html += `<tr>
+                            <td>${v.id}</td>
+                            <td>${v.produto}</td>
+                            <td>${v.quantidade}</td>
+                            <td>R$ ${v.valor_total.toFixed(2)}</td>
+                            <td>${v.data}</td>
+                        </tr>`;
+                    });
+                    document.getElementById('tabelaVendas').innerHTML = html;
+                });
+        }
+
+        function registrarVenda() {
+            const produto_id = document.getElementById('produto_id').value;
+            const quantidade = parseInt(document.getElementById('quantidade').value);
+
+            if (!produto_id || !quantidade) {
+                alert('Escolha um produto e digite a quantidade.');
+                return;
+            }
+
+            fetch('/api/vendas', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({produto_id, quantidade})
+            }).then(r => r.json()).then(res => {
+                if (res.sucesso) {
+                    alert('Venda registrada!');
+                    document.getElementById('quantidade').value = '';
+                    carregarProdutos();
+                    carregarVendas();
+                } else {
+                    alert(res.mensagem);
+                }
+            });
+        }
+
+        carregarProdutos();
+        carregarVendas();
+    </script>
+</body>
+</html>

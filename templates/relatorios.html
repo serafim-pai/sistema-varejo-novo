@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Relatórios</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        table { border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .card { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <nav style="margin-bottom:10px">
+        <a href="/">Produtos</a> &nbsp;
+        <a href="/vendas">Vendas</a> &nbsp;
+        <a href="/relatorios">Relatórios</a>
+    </nav>
+
+    <h1>Relatórios</h1>
+    
+    <h2>Resumo do Estoque</h2>
+    <div class="card">
+        <p>Total de Produtos: <strong id="totalProdutos">0</strong></p>
+        <p>Valor Total em Estoque: <strong id="valorTotal">R$ 0</strong></p>
+    </div>
+    
+    <h2>Produtos em Estoque</h2>
+    <table id="tabelaProdutos">
+        <tr>
+            <th>Nome</th>
+            <th>Quantidade</th>
+            <th>Preço</th>
+            <th>Total</th>
+        </tr>
+    </table>
+    
+    <script>
+        function carregarRelatorios() {
+            fetch('/api/produtos')
+                .then(r => r.json())
+                .then(produtos => {
+                    let total = 0;
+                    let valorTotal = 0;
+                    let html = '<tr><th>Nome</th><th>Quantidade</th><th>Preço</th><th>Total</th></tr>';
+                    
+                    produtos.forEach(p => {
+                        total++;
+                        valorTotal += p.quantidade * p.preco;
+                        html += `<tr><td>${p.nome}</td><td>${p.quantidade}</td><td>R$ ${p.preco}</td><td>R$ ${p.quantidade * p.preco}</td></tr>`;
+                    });
+                    
+                    document.getElementById('totalProdutos').textContent = total;
+                    document.getElementById('valorTotal').textContent = 'R$ ' + valorTotal.toFixed(2);
+                    document.getElementById('tabelaProdutos').innerHTML = html;
+                });
+        }
+        
+        carregarRelatorios();
+    </script>
+</body>
+</html>

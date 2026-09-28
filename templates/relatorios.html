@@ -48,11 +48,17 @@
     <p class="legenda">
         <span class="estoque-ok">Verde: estoque bom (10 ou mais)</span>
         <span class="estoque-baixo">Amarelo: estoque baixo (1 a 9)</span>
-        <span class="estoque-zerado">Vermelho: sem estoque (0)</span>
+        <span class="estoque-zerado">🔴 Vermelho: sem estoque (0)</span>
     </p>
     <table id="tabelaProdutos"></table>
 
     <script>
+        // Texto da quantidade: com bolinha vermelha quando o estoque zerar
+        function textoQuantidade(quantidade) {
+            if (quantidade <= 0) return '🔴 0 (SEM ESTOQUE)';
+            return quantidade;
+        }
+
         // Escolhe a cor da quantidade: verde, amarelo ou vermelho
         function corEstoque(quantidade) {
             if (quantidade <= 0) return 'estoque-zerado';
@@ -72,7 +78,7 @@
                         valorTotal += totalProduto;
                         html += `<tr>
                             <td>${p.nome}</td>
-                            <td class="${corEstoque(p.quantidade)}">${p.quantidade}</td>
+                            <td class="${corEstoque(p.quantidade)}">${textoQuantidade(p.quantidade)}</td>
                             <td>R$ ${p.preco.toFixed(2)}</td>
                             <td>R$ ${totalProduto.toFixed(2)}</td>
                         </tr>`;

@@ -10,6 +10,11 @@
         table { border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         .dica { color: #666; font-size: 14px; margin-left: 5px; }
+        #caixaEstoque { display: inline-block; min-width: 150px; padding: 8px 12px; margin: 5px;
+                        border: 2px solid #ccc; border-radius: 5px; font-weight: bold; background: #f5f5f5; color: #666; }
+        #caixaEstoque.estoque-ok { background: #d4edda; color: #155724; border-color: #28a745; }
+        #caixaEstoque.estoque-baixo { background: #fff3cd; color: #856404; border-color: #ffc107; }
+        #caixaEstoque.estoque-zerado { background: #f8d7da; color: #721c24; border-color: #dc3545; }
         nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
         nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
                 letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
@@ -31,6 +36,7 @@
     <!-- Campo de busca: digite parte do nome e escolha na lista -->
     <input type="text" id="busca" list="listaProdutos" placeholder="Digite o nome do produto..." autocomplete="off">
     <datalist id="listaProdutos"></datalist>
+    <span id="caixaEstoque">Estoque: —</span>
     <input type="number" id="quantidade" placeholder="Quantidade">
     <button onclick="registrarVenda()">Vender</button>
     <div class="dica">Dica: digite parte do nome (ex.: "cim") e clique no produto que aparecer.</div>
@@ -41,10 +47,29 @@
     <script>
         let listaProdutos = [];
 
-        // Texto que aparece na lista para cada produto
+        // Texto que aparece na lista para cada produto (só o nome)
         function textoDoProduto(p) {
-            return `${p.nome} (estoque: ${p.quantidade})`;
+            return p.nome;
         }
+
+        // Mostra o estoque do produto escolhido na caixa ao lado
+        function atualizarCaixaEstoque() {
+            const caixa = document.getElementById('caixaEstoque');
+            const p = produtoEscolhido();
+            caixa.className = '';
+            if (!p) {
+                caixa.textContent = 'Estoque: —';
+                return;
+            }
+            caixa.textContent = p.quantidade <= 0
+                ? '🔴 Estoque: 0 (SEM ESTOQUE)'
+                : 'Estoque: ' + p.quantidade + ' un.';
+            if (p.quantidade <= 0) caixa.className = 'estoque-zerado';
+            else if (p.quantidade < 10) caixa.className = 'estoque-baixo';
+            else caixa.className = 'estoque-ok';
+        }
+
+        document.getElementById('busca').addEventListener('input', atualizarCaixaEstoque);
 
         function carregarProdutos() {
             fetch('/api/produtos')
@@ -56,6 +81,7 @@
                         opcoes += `<option value="${textoDoProduto(p)}"></option>`;
                     });
                     document.getElementById('listaProdutos').innerHTML = opcoes;
+                    atualizarCaixaEstoque();
                 });
         }
 

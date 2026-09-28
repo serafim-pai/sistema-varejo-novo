@@ -9,6 +9,8 @@
         input, button, select { padding: 8px; margin: 5px; }
         table { border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .editando { background: #fff8d6; padding: 10px; border-radius: 5px; }
+        #btnCancelar { display: none; }
     </style>
 </head>
 <body>
@@ -20,22 +22,30 @@
 
     <h1>Cadastro de Produtos</h1>
 
-    <h2>Novo Produto</h2>
-    <input type="text" id="nome" placeholder="Nome">
-    <input type="number" id="preco" placeholder="Preço" step="0.01">
-    <input type="number" id="quantidade" placeholder="Quantidade">
-    <input type="text" id="categoria" placeholder="Categoria">
-    <button onclick="cadastrarProduto()">Cadastrar</button>
+    <div id="formulario">
+        <h2 id="tituloFormulario">Novo Produto</h2>
+        <input type="text" id="nome" placeholder="Nome">
+        <input type="number" id="preco" placeholder="Preço" step="0.01">
+        <input type="number" id="quantidade" placeholder="Quantidade">
+        <input type="text" id="categoria" placeholder="Categoria">
+        <button id="btnSalvar" onclick="salvarProduto()">Cadastrar</button>
+        <button id="btnCancelar" onclick="cancelarEdicao()">Cancelar</button>
+    </div>
 
     <h2>Produtos em Estoque</h2>
     <table id="tabelaProdutos"></table>
 
     <script>
+        // Guarda o ID do produto que está sendo editado (null = cadastrando um novo)
+        let idEmEdicao = null;
+        let listaProdutos = [];
+
         function carregarProdutos() {
             fetch('/api/produtos')
                 .then(r => r.json())
                 .then(produtos => {
-                    let html = '<tr><th>ID</th><th>Nome</th><th>Preço</th><th>Quantidade</th><th>Categoria</th><th>Ação</th></tr>';
+                    listaProdutos = produtos;
+                    let html = '<tr><th>ID</th><th>Nome</th><th>Preço</th><th>Quantidade</th><th>Categoria</th><th>Ações</th></tr>';
                     produtos.forEach(p => {
                         html += `<tr>
                             <td>${p.id}</td>
@@ -43,30 +53,72 @@
                             <td>R$ ${p.preco.toFixed(2)}</td>
                             <td>${p.quantidade}</td>
                             <td>${p.categoria}</td>
-                            <td><button onclick="deletarProduto(${p.id})">Excluir</button></td>
+                            <td>
+                                <button onclick="editarProduto(${p.id})">Editar</button>
+                                <button onclick="deletarProduto(${p.id})">Excluir</button>
+                            </td>
                         </tr>`;
                     });
                     document.getElementById('tabelaProdutos').innerHTML = html;
                 });
         }
 
-        function cadastrarProduto() {
-            const nome = document.getElementById('nome').value;
-            const preco = document.getElementById('preco').value;
-            const quantidade = document.getElementById('quantidade').value;
-            const categoria = document.getElementById('categoria').value;
+        function limparFormulario() {
+            document.getElementById('nome').value = '';
+            document.getElementById('preco').value = '';
+            document.getElementById('quantidade').value = '';
+            document.getElementById('categoria').value = '';
+        }
 
-            fetch('/api/produtos', {
-                method: 'POST',
+        // Clicou em "Editar": coloca os dados do produto no formulário
+        function editarProduto(id) {
+            const p = listaProdutos.find(item => item.id === id);
+            if (!p) return;
+
+            idEmEdicao = id;
+            document.getElementById('nome').value = p.nome;
+            document.getElementById('preco').value = p.preco;
+            document.getElementById('quantidade').value = p.quantidade;
+            document.getElementById('categoria').value = p.categoria;
+
+            document.getElementById('tituloFormulario').textContent = 'Editando: ' + p.nome;
+            document.getElementById('btnSalvar').textContent = 'Salvar alterações';
+            document.getElementById('btnCancelar').style.display = 'inline-block';
+            document.getElementById('formulario').classList.add('editando');
+            window.scrollTo(0, 0);
+        }
+
+        // Clicou em "Cancelar": volta ao modo de cadastro
+        function cancelarEdicao() {
+            idEmEdicao = null;
+            limparFormulario();
+            document.getElementById('tituloFormulario').textContent = 'Novo Produto';
+            document.getElementById('btnSalvar').textContent = 'Cadastrar';
+            document.getElementById('btnCancelar').style.display = 'none';
+            document.getElementById('formulario').classList.remove('editando');
+        }
+
+        // Clicou em "Cadastrar" ou "Salvar alterações"
+        function salvarProduto() {
+            const dados = {
+                nome: document.getElementById('nome').value,
+                preco: document.getElementById('preco').value,
+                quantidade: document.getElementById('quantidade').value,
+                categoria: document.getElementById('categoria').value
+            };
+
+            const editando = idEmEdicao !== null;
+            const url = editando ? '/api/produtos/' + idEmEdicao : '/api/produtos';
+            const metodo = editando ? 'PUT' : 'POST';
+
+            fetch(url, {
+                method: metodo,
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({nome, preco, quantidade, categoria})
+                body: JSON.stringify(dados)
             }).then(r => r.json()).then(res => {
                 if (res.sucesso) {
-                    alert('Produto cadastrado!');
-                    document.getElementById('nome').value = '';
-                    document.getElementById('preco').value = '';
-                    document.getElementById('quantidade').value = '';
-                    document.getElementById('categoria').value = '';
+                    alert(editando ? 'Produto atualizado!' : 'Produto cadastrado!');
+                    cancelarEdicao();
                     carregarProdutos();
                 } else {
                     alert(res.mensagem);

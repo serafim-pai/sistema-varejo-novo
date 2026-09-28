@@ -22,56 +22,62 @@ def pagina_relatorios():
     return render_template('relatorios.html')
 
 
+# ---------- VALIDAÇÃO (usada no cadastro e na edição) ----------
+
+def validar_produto(dados):
+    """Confere os dados do produto.
+    Devolve (mensagem_de_erro, None) se algo estiver errado,
+    ou (None, dados_limpos) se estiver tudo certo."""
+    nome = str(dados.get('nome', '')).strip()
+    categoria = str(dados.get('categoria', '')).strip()
+
+    if not nome:
+        return 'Digite o nome do produto.', None
+    if not categoria:
+        return 'Digite a categoria do produto.', None
+
+    try:
+        preco = float(dados.get('preco'))
+    except (TypeError, ValueError):
+        return 'Digite um preço válido.', None
+
+    try:
+        quantidade = int(dados.get('quantidade'))
+    except (TypeError, ValueError):
+        return 'Digite uma quantidade válida (número inteiro).', None
+
+    if preco <= 0:
+        return 'O preço precisa ser maior que zero.', None
+    if quantidade < 0:
+        return 'A quantidade não pode ser negativa.', None
+
+    return None, {
+        'nome': nome.upper(),
+        'preco': preco,
+        'quantidade': quantidade,
+        'categoria': categoria.upper()
+    }
+
+
 # ---------- API DE PRODUTOS ----------
 
 @app.route('/api/produtos', methods=['GET', 'POST'])
 def produtos():
     session = Session()
 
+    # Cadastrar um produto novo
     if request.method == 'POST':
-        dados = request.json
-
-        # --- Validações: conferir os dados antes de salvar ---
-        nome = str(dados.get('nome', '')).strip()
-        categoria = str(dados.get('categoria', '')).strip()
-
-        if not nome:
+        erro, limpos = validar_produto(request.json)
+        if erro:
             session.close()
-            return jsonify({'sucesso': False, 'mensagem': 'Digite o nome do produto.'})
-        if not categoria:
-            session.close()
-            return jsonify({'sucesso': False, 'mensagem': 'Digite a categoria do produto.'})
+            return jsonify({'sucesso': False, 'mensagem': erro})
 
-        try:
-            preco = float(dados.get('preco'))
-        except (TypeError, ValueError):
-            session.close()
-            return jsonify({'sucesso': False, 'mensagem': 'Digite um preço válido.'})
-
-        try:
-            quantidade = int(dados.get('quantidade'))
-        except (TypeError, ValueError):
-            session.close()
-            return jsonify({'sucesso': False, 'mensagem': 'Digite uma quantidade válida (número inteiro).'})
-
-        if preco <= 0:
-            session.close()
-            return jsonify({'sucesso': False, 'mensagem': 'O preço precisa ser maior que zero.'})
-        if quantidade < 0:
-            session.close()
-            return jsonify({'sucesso': False, 'mensagem': 'A quantidade não pode ser negativa.'})
-
-        novo_produto = Produto(
-            nome=nome.upper(),
-            preco=preco,
-            quantidade=quantidade,
-            categoria=categoria.upper()
-        )
-        session.add(novo_produto)
+        session.add(Produto(**limpos))
         session.commit()
         session.close()
         return jsonify({'sucesso': True})
 
+    # Listar todos os produtos
     todos_produtos = session.query(Produto).order_by(Produto.nome).all()
     resultado = [{
         'id': p.id,
@@ -82,6 +88,29 @@ def produtos():
     } for p in todos_produtos]
     session.close()
     return jsonify(resultado)
+
+
+@app.route('/api/produtos/<int:id>', methods=['PUT'])
+def editar_produto(id):
+    session = Session()
+    produto = session.query(Produto).filter_by(id=id).first()
+
+    if not produto:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Produto não encontrado.'})
+
+    erro, limpos = validar_produto(request.json)
+    if erro:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': erro})
+
+    produto.nome = limpos['nome']
+    produto.preco = limpos['preco']
+    produto.quantidade = limpos['quantidade']
+    produto.categoria = limpos['categoria']
+    session.commit()
+    session.close()
+    return jsonify({'sucesso': True})
 
 
 @app.route('/api/produtos/<int:id>', methods=['DELETE'])

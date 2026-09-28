@@ -10,7 +10,8 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 3. **Histórico de vendas**: mostra o que foi vendido, a quantidade, o valor e a data.
 4. **Relatórios**: total de produtos e valor total em estoque.
 5. **Proteção**: não deixa vender mais do que existe no estoque.
-6. **Validações no cadastro**: não aceita nome ou categoria vazios, preço zero ou negativo, nem quantidade negativa.
+6. **Editar produtos**: corrige nome, preço, quantidade ou categoria de um produto já cadastrado.
+7. **Validações no cadastro**: não aceita nome ou categoria vazios, preço zero ou negativo, nem quantidade negativa.
 
 ## 🛠️ Tecnologias usadas
 

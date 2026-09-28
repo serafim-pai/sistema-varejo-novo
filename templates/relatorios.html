@@ -5,58 +5,98 @@
     <title>Relatórios</title>
     <style>
         body { font-family: Arial; margin: 20px; }
+        nav a { margin-right: 15px; }
         table { border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         .card { background: #f0f0f0; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .destaque { background: #e8f5e9; padding: 15px; margin: 10px 0; border-radius: 5px; font-size: 18px; }
     </style>
 </head>
 <body>
-    <nav style="margin-bottom:10px">
-        <a href="/">Produtos</a> &nbsp;
-        <a href="/vendas">Vendas</a> &nbsp;
+    <nav>
+        <a href="/">Produtos</a>
+        <a href="/vendas">Vendas</a>
         <a href="/relatorios">Relatórios</a>
     </nav>
 
     <h1>Relatórios</h1>
-    
+
     <h2>Resumo do Estoque</h2>
     <div class="card">
         <p>Total de Produtos: <strong id="totalProdutos">0</strong></p>
-        <p>Valor Total em Estoque: <strong id="valorTotal">R$ 0</strong></p>
+        <p>Valor Total em Estoque: <strong id="valorTotal">R$ 0.00</strong></p>
     </div>
-    
+
+    <h2>🏆 Produtos Mais Vendidos</h2>
+    <div class="destaque" id="campeao">Nenhuma venda registrada ainda.</div>
+    <div class="card">
+        <p>Total de Vendas: <strong id="totalVendas">0</strong></p>
+        <p>Valor Total Vendido: <strong id="valorVendido">R$ 0.00</strong></p>
+    </div>
+    <table id="tabelaMaisVendidos"></table>
+
     <h2>Produtos em Estoque</h2>
-    <table id="tabelaProdutos">
-        <tr>
-            <th>Nome</th>
-            <th>Quantidade</th>
-            <th>Preço</th>
-            <th>Total</th>
-        </tr>
-    </table>
-    
+    <table id="tabelaProdutos"></table>
+
     <script>
-        function carregarRelatorios() {
+        function carregarEstoque() {
             fetch('/api/produtos')
                 .then(r => r.json())
                 .then(produtos => {
-                    let total = 0;
                     let valorTotal = 0;
                     let html = '<tr><th>Nome</th><th>Quantidade</th><th>Preço</th><th>Total</th></tr>';
-                    
+
                     produtos.forEach(p => {
-                        total++;
-                        valorTotal += p.quantidade * p.preco;
-                        html += `<tr><td>${p.nome}</td><td>${p.quantidade}</td><td>R$ ${p.preco}</td><td>R$ ${p.quantidade * p.preco}</td></tr>`;
+                        const totalProduto = p.quantidade * p.preco;
+                        valorTotal += totalProduto;
+                        html += `<tr>
+                            <td>${p.nome}</td>
+                            <td>${p.quantidade}</td>
+                            <td>R$ ${p.preco.toFixed(2)}</td>
+                            <td>R$ ${totalProduto.toFixed(2)}</td>
+                        </tr>`;
                     });
-                    
-                    document.getElementById('totalProdutos').textContent = total;
+
+                    document.getElementById('totalProdutos').textContent = produtos.length;
                     document.getElementById('valorTotal').textContent = 'R$ ' + valorTotal.toFixed(2);
                     document.getElementById('tabelaProdutos').innerHTML = html;
                 });
         }
-        
-        carregarRelatorios();
+
+        function carregarMaisVendidos() {
+            fetch('/api/relatorios/mais-vendidos')
+                .then(r => r.json())
+                .then(dados => {
+                    document.getElementById('totalVendas').textContent = dados.total_vendas;
+                    document.getElementById('valorVendido').textContent = 'R$ ' + dados.valor_vendido.toFixed(2);
+
+                    const ranking = dados.ranking;
+                    if (ranking.length === 0) {
+                        document.getElementById('campeao').textContent = 'Nenhuma venda registrada ainda.';
+                        document.getElementById('tabelaMaisVendidos').innerHTML = '';
+                        return;
+                    }
+
+                    const primeiro = ranking[0];
+                    document.getElementById('campeao').innerHTML =
+                        `🥇 O produto que mais vende é <strong>${primeiro.produto}</strong>, com <strong>${primeiro.quantidade_vendida}</strong> unidades vendidas.`;
+
+                    let html = '<tr><th>Posição</th><th>Produto</th><th>Unidades Vendidas</th><th>Nº de Vendas</th><th>Valor Vendido</th></tr>';
+                    ranking.forEach((item, i) => {
+                        html += `<tr>
+                            <td>${i + 1}º</td>
+                            <td>${item.produto}</td>
+                            <td>${item.quantidade_vendida}</td>
+                            <td>${item.numero_vendas}</td>
+                            <td>R$ ${item.valor_vendido.toFixed(2)}</td>
+                        </tr>`;
+                    });
+                    document.getElementById('tabelaMaisVendidos').innerHTML = html;
+                });
+        }
+
+        carregarEstoque();
+        carregarMaisVendidos();
     </script>
 </body>
 </html>

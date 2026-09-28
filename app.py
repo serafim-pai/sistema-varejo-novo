@@ -36,6 +36,13 @@ def validar_produto(dados):
     if not categoria:
         return 'Digite a categoria do produto.', None
 
+    # O nome e a categoria precisam ter pelo menos 2 letras
+    # (evita nomes como "." ou "-")
+    if sum(1 for letra in nome if letra.isalpha()) < 2:
+        return 'O nome precisa ter pelo menos 2 letras.', None
+    if sum(1 for letra in categoria if letra.isalpha()) < 2:
+        return 'A categoria precisa ter pelo menos 2 letras.', None
+
     try:
         preco = float(dados.get('preco'))
     except (TypeError, ValueError):
@@ -171,6 +178,39 @@ def vendas():
         })
     session.close()
     return jsonify(resultado)
+
+
+# ---------- RELATÓRIO: PRODUTOS MAIS VENDIDOS ----------
+
+@app.route('/api/relatorios/mais-vendidos')
+def mais_vendidos():
+    session = Session()
+    todas_vendas = session.query(Venda).all()
+
+    # Soma as vendas de cada produto
+    resumo = {}
+    for v in todas_vendas:
+        if v.produto_id not in resumo:
+            produto = session.query(Produto).filter_by(id=v.produto_id).first()
+            resumo[v.produto_id] = {
+                'produto': produto.nome if produto else '(produto excluído)',
+                'quantidade_vendida': 0,
+                'numero_vendas': 0,
+                'valor_vendido': 0.0
+            }
+        resumo[v.produto_id]['quantidade_vendida'] += v.quantidade
+        resumo[v.produto_id]['numero_vendas'] += 1
+        resumo[v.produto_id]['valor_vendido'] += v.valor_total
+
+    # Ordena do que mais vendeu para o que menos vendeu
+    ranking = sorted(resumo.values(), key=lambda item: item['quantidade_vendida'], reverse=True)
+
+    session.close()
+    return jsonify({
+        'ranking': ranking,
+        'total_vendas': len(todas_vendas),
+        'valor_vendido': sum(v.valor_total for v in todas_vendas)
+    })
 
 
 if __name__ == '__main__':

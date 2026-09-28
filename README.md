@@ -8,7 +8,7 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 1. **Cadastro de produtos**: nome, preço, quantidade e categoria.
 2. **Registro de vendas**: o estoque diminui sozinho a cada venda.
 3. **Histórico de vendas**: mostra o que foi vendido, a quantidade, o valor e a data.
-4. **Relatórios**: total de produtos e valor total em estoque.
+4. **Relatórios**: total de produtos, valor em estoque e ranking dos **produtos mais vendidos**.
 5. **Proteção**: não deixa vender mais do que existe no estoque.
 6. **Editar produtos**: corrige nome, preço, quantidade ou categoria de um produto já cadastrado.
 7. **Validações no cadastro**: não aceita nome ou categoria vazios, preço zero ou negativo, nem quantidade negativa.
@@ -47,7 +47,7 @@ sistema-varejo-novo/
 ## 🚀 Próximos passos
 
 - [x] Não aceitar campos vazios nem números negativos
-- [ ] Mostrar no relatório qual produto mais vende
+- [x] Mostrar no relatório qual produto mais vende
 - [ ] Melhorar a aparência das telas
 
 ## 👤 Autor

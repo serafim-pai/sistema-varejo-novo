@@ -21,6 +21,7 @@
                 padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
         nav a:hover { background: #ff8a3d; }
         nav a.ativo { background: #ffffff; color: #e65100; }
+        .btn-cancelar { background: #dc3545; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -109,7 +110,7 @@
             fetch('/api/vendas')
                 .then(r => r.json())
                 .then(vendas => {
-                    let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Data</th></tr>';
+                    let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Data</th><th>Ação</th></tr>';
                     vendas.forEach(v => {
                         html += `<tr>
                             <td>${v.id}</td>
@@ -117,6 +118,7 @@
                             <td>${v.quantidade}</td>
                             <td>R$ ${v.valor_total.toFixed(2)}</td>
                             <td>${v.data}</td>
+                            <td><button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button></td>
                         </tr>`;
                     });
                     document.getElementById('tabelaVendas').innerHTML = html;
@@ -147,11 +149,40 @@
                     document.getElementById('quantidade').value = '';
                     carregarProdutos();
                     carregarVendas();
+                    document.getElementById('busca').focus();
                 } else {
                     alert(res.mensagem);
                 }
             });
         }
+
+        // Cancelar uma venda: devolve os produtos ao estoque
+        function cancelarVenda(id, produto, quantidade) {
+            if (!confirm(`Cancelar a venda nº ${id}?\n\n${quantidade} x ${produto} vão VOLTAR para o estoque.`)) return;
+
+            fetch('/api/vendas/' + id, {method: 'DELETE'})
+                .then(r => r.json())
+                .then(res => {
+                    if (res.sucesso) {
+                        alert('Venda cancelada. O estoque foi devolvido.');
+                        carregarProdutos();
+                        carregarVendas();
+                    } else {
+                        alert(res.mensagem);
+                    }
+                });
+        }
+
+        // Tecla Enter: no campo do produto pula para a quantidade; na quantidade, vende
+        document.getElementById('busca').addEventListener('keydown', evento => {
+            if (evento.key === 'Enter') {
+                evento.preventDefault();
+                document.getElementById('quantidade').focus();
+            }
+        });
+        document.getElementById('quantidade').addEventListener('keydown', evento => {
+            if (evento.key === 'Enter') registrarVenda();
+        });
 
         carregarProdutos();
         carregarVendas();

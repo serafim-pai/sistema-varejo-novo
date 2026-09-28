@@ -20,6 +20,11 @@
                 padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
         nav a:hover { background: #ff8a3d; }
         nav a.ativo { background: #ffffff; color: #e65100; }
+        .aviso { border-radius: 6px; padding: 12px 16px; margin: 10px 0 15px; font-size: 16px; }
+        .aviso-alerta { background: #fff3cd; border: 2px solid #ffc107; color: #5c4400; }
+        .aviso-ok { background: #d4edda; border: 2px solid #28a745; color: #155724; }
+        .aviso ul { margin: 6px 0 0; padding-left: 22px; }
+        .btn-entrada { background: #28a745; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -30,6 +35,9 @@
     </nav>
 
     <h1>Cadastro de Produtos</h1>
+
+    <!-- Aviso de produtos com estoque baixo ou zerado -->
+    <div id="avisoEstoque" class="aviso"></div>
 
     <div id="formulario">
         <h2 id="tituloFormulario">Novo Produto</h2>
@@ -81,12 +89,14 @@
                             <td class="${corEstoque(p.quantidade)}">${textoQuantidade(p.quantidade)}</td>
                             <td>${p.categoria}</td>
                             <td>
+                                <button class="btn-entrada" onclick="entradaEstoque(${p.id})">+ Entrada</button>
                                 <button onclick="editarProduto(${p.id})">Editar</button>
                                 <button onclick="deletarProduto(${p.id})">Excluir</button>
                             </td>
                         </tr>`;
                     });
                     document.getElementById('tabelaProdutos').innerHTML = html;
+                    mostrarAviso(produtos);
                 });
         }
 
@@ -159,6 +169,55 @@
                 .then(r => r.json())
                 .then(() => carregarProdutos());
         }
+
+        // Mostra no alto da tela os produtos que precisam de reposição
+        function mostrarAviso(produtos) {
+            const aviso = document.getElementById('avisoEstoque');
+            const zerados = produtos.filter(p => p.quantidade <= 0);
+            const baixos = produtos.filter(p => p.quantidade > 0 && p.quantidade < 10);
+
+            if (zerados.length === 0 && baixos.length === 0) {
+                aviso.className = 'aviso aviso-ok';
+                aviso.innerHTML = '🟢 <strong>Estoque em dia!</strong> Nenhum produto precisa de reposição.';
+                return;
+            }
+
+            let html = '⚠️ <strong>Atenção: produtos para repor</strong><ul>';
+            zerados.forEach(p => { html += `<li>🔴 <strong>${p.nome}</strong>: SEM ESTOQUE</li>`; });
+            baixos.forEach(p => { html += `<li>🟡 <strong>${p.nome}</strong>: só ${p.quantidade} un.</li>`; });
+            html += '</ul>';
+            aviso.className = 'aviso aviso-alerta';
+            aviso.innerHTML = html;
+        }
+
+        // Clicou em "+ Entrada": pergunta quanto chegou e soma ao estoque
+        function entradaEstoque(id) {
+            const p = listaProdutos.find(item => item.id === id);
+            if (!p) return;
+
+            const resposta = prompt(`Entrada de estoque: ${p.nome}\nEstoque atual: ${p.quantidade} un.\n\nQuantas unidades chegaram?`);
+            if (resposta === null) return;   // clicou em Cancelar
+
+            fetch('/api/produtos/' + id + '/entrada', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({quantidade: resposta})
+            }).then(r => r.json()).then(res => {
+                if (res.sucesso) {
+                    alert(`Entrada registrada! ${res.nome} agora tem ${res.novo_total} un.`);
+                    carregarProdutos();
+                } else {
+                    alert(res.mensagem);
+                }
+            });
+        }
+
+        // Tecla Enter nos campos do formulário = clicar em Cadastrar / Salvar
+        ['nome', 'preco', 'quantidade', 'categoria'].forEach(campo => {
+            document.getElementById(campo).addEventListener('keydown', evento => {
+                if (evento.key === 'Enter') salvarProduto();
+            });
+        });
 
         carregarProdutos();
     </script>

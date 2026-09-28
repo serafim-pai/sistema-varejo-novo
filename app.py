@@ -135,6 +135,34 @@ def deletar_produto(id):
     return jsonify({'sucesso': False})
 
 
+@app.route('/api/produtos/<int:id>/entrada', methods=['POST'])
+def entrada_estoque(id):
+    """Repor estoque: soma a quantidade que chegou ao estoque atual."""
+    session = Session()
+    produto = session.query(Produto).filter_by(id=id).first()
+
+    if not produto:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Produto não encontrado.'})
+
+    try:
+        quantidade = int(request.json.get('quantidade'))
+    except (TypeError, ValueError):
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Digite uma quantidade válida (número inteiro).'})
+
+    if quantidade <= 0:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'A quantidade de entrada precisa ser maior que zero.'})
+
+    produto.quantidade += quantidade
+    novo_total = produto.quantidade
+    nome = produto.nome
+    session.commit()
+    session.close()
+    return jsonify({'sucesso': True, 'nome': nome, 'novo_total': novo_total})
+
+
 # ---------- API DE VENDAS ----------
 
 @app.route('/api/vendas', methods=['GET', 'POST'])
@@ -178,6 +206,26 @@ def vendas():
         })
     session.close()
     return jsonify(resultado)
+
+
+@app.route('/api/vendas/<int:id>', methods=['DELETE'])
+def cancelar_venda(id):
+    """Cancelar venda: devolve os produtos ao estoque e apaga a venda."""
+    session = Session()
+    venda = session.query(Venda).filter_by(id=id).first()
+
+    if not venda:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Venda não encontrada.'})
+
+    produto = session.query(Produto).filter_by(id=venda.produto_id).first()
+    if produto:
+        produto.quantidade += venda.quantidade
+
+    session.delete(venda)
+    session.commit()
+    session.close()
+    return jsonify({'sucesso': True})
 
 
 # ---------- RELATÓRIO: PRODUTOS MAIS VENDIDOS ----------

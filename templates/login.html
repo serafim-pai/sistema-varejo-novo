@@ -23,6 +23,7 @@
 </head>
 <body>
     <form class="caixa" method="post" autocomplete="off" id="formLogin">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% if modo == 'primeiro' %}
             <h1>Bem-vindo!</h1>
             <p class="sub">Primeiro acesso: crie o <strong>ADMINISTRADOR MASTER</strong> do sistema.</p>

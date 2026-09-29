@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect
 from flask import session as login          # "login" guarda quem está usando o sistema
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import (Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, Cliente, UNIDADES,
                       FORMAS_PAGAMENTO, FORMAS_COM_DESCONTO, DESCONTO_MAXIMO_BALCAO)
@@ -22,6 +23,23 @@ with open(ARQUIVO_CHAVE) as arquivo:
     app.secret_key = arquivo.read().strip()
 
 app.permanent_session_lifetime = timedelta(hours=12)   # login vale por 12 horas
+
+# ---------- PROTEÇÃO CONTRA CSRF ----------
+# Protege automaticamente toda rota que muda dados (POST, PUT, PATCH, DELETE).
+# O token não expira sozinho (só quando a sessão de 12h expira), para não
+# atrapalhar quem deixa a tela aberta o dia todo no balcão.
+app.config['WTF_CSRF_TIME_LIMIT'] = None
+csrf = CSRFProtect(app)
+
+
+@app.errorhandler(CSRFError)
+def token_csrf_invalido(erro):
+    """Pedido sem o token de segurança (ou com um token velho): recusa
+    com uma mensagem amigável em vez da página de erro padrão do Flask."""
+    if request.path.startswith('/api/'):
+        return jsonify({'sucesso': False,
+                        'mensagem': 'Sessão expirada ou inválida. Recarregue a página e tente novamente.'}), 400
+    return redirect('/login')
 
 
 # ---------- LOGIN: quem pode entrar e onde ----------

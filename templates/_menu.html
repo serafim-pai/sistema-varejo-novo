@@ -1,4 +1,6 @@
 {# Menu de cima, igual em todas as telas. Cada tela diz qual é a "pagina" ativa. #}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
 <style>
     /* Menu compacto: cabe numa linha só em telas normais */
     nav { display: flex; align-items: center; flex-wrap: wrap; gap: 4px;

@@ -45,6 +45,7 @@
     <input type="text" id="busca" placeholder="🔎 Procurar por nome, telefone ou CPF..." autocomplete="off">
     <table id="tabelaClientes"></table>
 
+    <script src="{{ url_for('static', filename='js/escapar.js') }}"></script>
     <script>
         const EH_ADMIN = {{ 'true' if admin else 'false' }};
         const CAMPOS = ['nome', 'telefone', 'documento', 'endereco'];
@@ -80,10 +81,10 @@
             let html = '<tr><th>Nome</th><th>Telefone</th><th>CPF / CNPJ</th><th>Endereço</th><th>Cadastrado em</th><th>Ações</th></tr>';
             filtrados.forEach(c => {
                 html += `<tr>
-                    <td>${c.nome}</td>
-                    <td>${c.telefone || '-'}</td>
-                    <td>${c.documento || '-'}</td>
-                    <td>${c.endereco || '-'}</td>
+                    <td>${escapar(c.nome)}</td>
+                    <td>${escapar(c.telefone) || '-'}</td>
+                    <td>${escapar(c.documento) || '-'}</td>
+                    <td>${escapar(c.endereco) || '-'}</td>
                     <td>${c.criado_em}</td>
                     <td>
                         <button onclick="editarCliente(${c.id})">Editar</button>

@@ -99,6 +99,7 @@
 
     <table id="tabelaOrcamentos"></table>
 
+    <script src="{{ url_for('static', filename='js/escapar.js') }}"></script>
     <script>
         let listaOrcamentos = [];
         let filtroAtual = 'TODOS';
@@ -158,15 +159,15 @@
 
             let html = '<tr><th>Nº</th><th>Feito em</th><th>Vendedor</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Situação</th><th>Ações</th></tr>';
             filtrados.forEach(o => {
-                const resumo = o.itens.map(i => `${i.quantidade} ${i.unidade} ${i.produto}`).join('<br>');
+                const resumo = o.itens.map(i => `${i.quantidade} ${i.unidade} ${escapar(i.produto)}`).join('<br>');
                 const podeVender = o.situacao === 'ABERTO' || o.situacao === 'VENCENDO';
                 const podeCancelar = podeVender || o.situacao === 'VENCIDO';
 
                 html += `<tr class="linha-${o.situacao}">
                     <td><strong>${o.id}</strong></td>
                     <td>${o.data}<br><span class="idade">${textoIdade(o.dias)}</span></td>
-                    <td>${o.vendedor || '-'}</td>
-                    <td><strong>${o.cliente}</strong>${o.telefone ? '<br>📞 ' + o.telefone : ''}${o.endereco ? '<br>🚚 ' + o.endereco : ''}</td>
+                    <td>${escapar(o.vendedor) || '-'}</td>
+                    <td><strong>${escapar(o.cliente)}</strong>${o.telefone ? '<br>📞 ' + escapar(o.telefone) : ''}${o.endereco ? '<br>🚚 ' + escapar(o.endereco) : ''}</td>
                     <td class="resumo">${resumo}</td>
                     <td><strong>${dinheiro(o.total)}</strong></td>
                     <td>${textoSituacao(o)}</td>
@@ -186,7 +187,7 @@
             let linhas = '';
             o.itens.forEach(item => {
                 linhas += `<tr>
-                    <td>${item.quantidade} ${item.unidade} - ${item.produto}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
+                    <td>${item.quantidade} ${item.unidade} - ${escapar(item.produto)}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
                     <td class="direita">${dinheiro(item.subtotal)}</td>
                 </tr>`;
             });
@@ -195,11 +196,11 @@
                 <div class="centro"><strong>ORÇAMENTO Nº ${o.id}</strong></div>
                 <div class="centro"><small>(não é venda – sem valor fiscal)</small></div>
                 <hr>
-                <div>Cliente: ${o.cliente}</div>
-                ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
-                ${o.endereco ? `<div>Entrega: ${o.endereco}</div>` : ''}
+                <div>Cliente: ${escapar(o.cliente)}</div>
+                ${o.telefone ? `<div>Telefone: ${escapar(o.telefone)}</div>` : ''}
+                ${o.endereco ? `<div>Entrega: ${escapar(o.endereco)}</div>` : ''}
                 <div>Data: ${o.data}</div>
-                ${o.vendedor ? `<div>Atendido por: ${o.vendedor}</div>` : ''}
+                ${o.vendedor ? `<div>Atendido por: ${escapar(o.vendedor)}</div>` : ''}
                 <div><strong>Válido até: ${o.valido_ate}</strong></div>
                 <hr>
                 <table>${linhas}</table>

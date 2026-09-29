@@ -73,6 +73,7 @@
     </p>
     <table id="tabelaProdutos"></table>
 
+    <script src="{{ url_for('static', filename='js/escapar.js') }}"></script>
     <script>
         // Texto da quantidade: com bolinha vermelha quando o estoque zerar
         function textoQuantidade(quantidade) {
@@ -132,9 +133,9 @@
                         }
 
                         html += `<tr>
-                            <td>${p.nome}</td>
+                            <td>${escapar(p.nome)}</td>
                             <td class="${corEstoque(p.quantidade)}">${textoQuantidade(p.quantidade)}</td>
-                            <td>${p.unidade}</td>
+                            <td>${escapar(p.unidade)}</td>
                             <td>${temCusto ? dinheiro(p.preco_compra) : '-'}</td>
                             <td>${dinheiro(p.preco)}</td>
                             <td>${textoLucro(lucroUnidade)}</td>
@@ -154,7 +155,7 @@
                     if (semCusto.length > 0) {
                         aviso.style.display = 'block';
                         aviso.innerHTML = `⚠️ <strong>${semCusto.length} produto(s) sem preço de compra</strong> `
-                            + `ficaram fora da conta do custo e do lucro: ${semCusto.join(', ')}. `
+                            + `ficaram fora da conta do custo e do lucro: ${semCusto.map(escapar).join(', ')}. `
                             + `Cadastre o preço de compra em <a href="/">Produtos</a> (botão Editar).`;
                     } else {
                         aviso.style.display = 'none';
@@ -173,7 +174,7 @@
 
                     let htmlVend = '<tr><th>Vendedor</th><th>Nº de vendas</th><th>Valor vendido</th><th>Descontos dados</th></tr>';
                     dados.por_vendedor.forEach(v => {
-                        htmlVend += `<tr><td><strong>${v.vendedor}</strong></td><td>${v.numero_vendas}</td>
+                        htmlVend += `<tr><td><strong>${escapar(v.vendedor)}</strong></td><td>${v.numero_vendas}</td>
                             <td>${dinheiro(v.valor)}</td><td>${v.desconto > 0 ? dinheiro(v.desconto) : '-'}</td></tr>`;
                     });
                     document.getElementById('tabelaVendedores').innerHTML = dados.por_vendedor.length
@@ -201,7 +202,7 @@
 
                     const primeiro = ranking[0];
                     document.getElementById('campeao').innerHTML =
-                        `🥇 O produto que mais vende é <strong>${primeiro.produto}</strong>, com <strong>${primeiro.quantidade_vendida} ${primeiro.unidade}</strong> vendidos.`;
+                        `🥇 O produto que mais vende é <strong>${escapar(primeiro.produto)}</strong>, com <strong>${primeiro.quantidade_vendida} ${escapar(primeiro.unidade)}</strong> vendidos.`;
 
                     let html = '<tr><th>Posição</th><th>Produto</th><th>Quantidade Vendida</th><th>Nº de Vendas</th>'
                              + '<th>Valor Vendido</th><th>Custo</th><th>Lucro</th><th>% Lucro</th></tr>';
@@ -209,8 +210,8 @@
                         const temLucro = item.lucro !== null;
                         html += `<tr>
                             <td>${i + 1}º</td>
-                            <td>${item.produto}</td>
-                            <td>${item.quantidade_vendida} ${item.unidade}</td>
+                            <td>${escapar(item.produto)}</td>
+                            <td>${item.quantidade_vendida} ${escapar(item.unidade)}</td>
                             <td>${item.numero_vendas}</td>
                             <td>${dinheiro(item.valor_vendido)}</td>
                             <td>${temLucro ? dinheiro(item.custo) : '-'}</td>

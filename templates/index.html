@@ -91,6 +91,7 @@
     </p>
     <table id="tabelaProdutos"></table>
 
+    <script src="{{ url_for('static', filename='js/escapar.js') }}"></script>
     <script>
         // Texto da quantidade: com bolinha vermelha quando o estoque zerar
         function textoQuantidade(quantidade) {
@@ -160,12 +161,12 @@
                     produtos.forEach(p => {
                         html += `<tr>
                             <td>${p.id}</td>
-                            <td>${p.nome}</td>
+                            <td>${escapar(p.nome)}</td>
                             ${EH_ADMIN ? `<td class="custo">${textoCusto(p)}</td><td class="custo">${textoMargem(p)}</td>` : ''}
                             <td>R$ ${p.preco.toFixed(2)}</td>
                             <td class="${corEstoque(p.quantidade)}">${textoQuantidade(p.quantidade)}</td>
-                            <td>${p.unidade}</td>
-                            <td>${p.categoria}</td>
+                            <td>${escapar(p.unidade)}</td>
+                            <td>${escapar(p.categoria)}</td>
                             ${EH_ADMIN ? `<td>
                                 <button class="btn-entrada" onclick="entradaEstoque(${p.id})">+ Entrada</button>
                                 <button onclick="editarProduto(${p.id})">Editar</button>
@@ -270,8 +271,8 @@
             }
 
             let html = '⚠️ <strong>Atenção: produtos para repor</strong><ul>';
-            zerados.forEach(p => { html += `<li>🔴 <strong>${p.nome}</strong>: SEM ESTOQUE</li>`; });
-            baixos.forEach(p => { html += `<li>🟡 <strong>${p.nome}</strong>: só ${p.quantidade} ${p.unidade}</li>`; });
+            zerados.forEach(p => { html += `<li>🔴 <strong>${escapar(p.nome)}</strong>: SEM ESTOQUE</li>`; });
+            baixos.forEach(p => { html += `<li>🟡 <strong>${escapar(p.nome)}</strong>: só ${p.quantidade} ${escapar(p.unidade)}</li>`; });
             html += '</ul>';
             aviso.className = 'aviso aviso-alerta';
             aviso.innerHTML = html;

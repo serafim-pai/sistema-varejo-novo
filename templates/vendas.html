@@ -170,6 +170,7 @@
     <h2>Histórico de Vendas</h2>
     <table id="tabelaVendas"></table>
 
+    <script src="{{ url_for('static', filename='js/escapar.js') }}"></script>
     <script>
         let listaProdutos = [];
         let carrinho = [];   // cada item: {produto_id, nome, preco, unidade, quantidade}
@@ -187,7 +188,7 @@
                 .then(produtos => {
                     listaProdutos = produtos;
                     let opcoes = '';
-                    produtos.forEach(p => { opcoes += `<option value="${p.nome}"></option>`; });
+                    produtos.forEach(p => { opcoes += `<option value="${escapar(p.nome)}"></option>`; });
                     document.getElementById('listaProdutos').innerHTML = opcoes;
                     atualizarCaixaEstoque();
                 });
@@ -283,8 +284,8 @@
                 const subtotal = item.quantidade * item.preco;
                 total += subtotal;
                 html += `<tr>
-                    <td>${item.nome}</td>
-                    <td>${item.quantidade} ${item.unidade}</td>
+                    <td>${escapar(item.nome)}</td>
+                    <td>${item.quantidade} ${escapar(item.unidade)}</td>
                     <td>${dinheiro(item.preco)} / ${item.unidade}</td>
                     <td>${dinheiro(subtotal)}</td>
                     <td><button class="btn-remover" onclick="removerDoCarrinho(${i})">Remover</button></td>
@@ -484,7 +485,7 @@
             let linhas = '';
             res.itens.forEach(item => {
                 linhas += `<tr>
-                    <td>${item.quantidade} ${item.unidade} - ${item.produto}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
+                    <td>${item.quantidade} ${item.unidade} - ${escapar(item.produto)}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
                     <td class="direita">${dinheiro(item.subtotal)}</td>
                 </tr>`;
             });
@@ -497,17 +498,17 @@
                 <hr>
                 <div>Venda nº: ${res.numero}</div>
                 <div>Data: ${res.data}</div>
-                ${res.vendedor ? `<div>Atendido por: ${res.vendedor}</div>` : ''}
-                ${res.cliente ? `<div>Cliente: ${res.cliente}</div>` : ''}
-                ${res.telefone ? `<div>Telefone: ${res.telefone}</div>` : ''}
-                ${res.endereco ? `<hr><div><strong>🚚 ENTREGAR EM:</strong><br>${res.endereco}</div>` : ''}
+                ${res.vendedor ? `<div>Atendido por: ${escapar(res.vendedor)}</div>` : ''}
+                ${res.cliente ? `<div>Cliente: ${escapar(res.cliente)}</div>` : ''}
+                ${res.telefone ? `<div>Telefone: ${escapar(res.telefone)}</div>` : ''}
+                ${res.endereco ? `<hr><div><strong>🚚 ENTREGAR EM:</strong><br>${escapar(res.endereco)}</div>` : ''}
                 <hr>
                 <table>${linhas}</table>
                 <hr>
                 ${res.desconto > 0 ? `<div class="direita">Subtotal: ${dinheiro(res.subtotal)}</div>
                 <div class="direita">Desconto (${res.desconto_percentual.toFixed(2)}%): - ${dinheiro(res.desconto)}</div>` : ''}
                 <div class="total-cupom">TOTAL: ${dinheiro(res.total)}</div>
-                <div>Pagamento: <strong>${res.forma_pagamento}</strong></div>
+                <div>Pagamento: <strong>${escapar(res.forma_pagamento)}</strong></div>
                 ${res.valor_recebido !== null ? `<div>Valor recebido: ${dinheiro(res.valor_recebido)}</div>
                 <div><strong>Troco: ${dinheiro(res.troco)}</strong></div>` : ''}
                 <hr>
@@ -568,7 +569,7 @@
             let linhas = '';
             o.itens.forEach(item => {
                 linhas += `<tr>
-                    <td>${item.quantidade} ${item.unidade} - ${item.produto}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
+                    <td>${item.quantidade} ${item.unidade} - ${escapar(item.produto)}<br><small>${dinheiro(item.preco)} / ${item.unidade}</small></td>
                     <td class="direita">${dinheiro(item.subtotal)}</td>
                 </tr>`;
             });
@@ -577,11 +578,11 @@
                 <div class="centro"><strong>ORÇAMENTO Nº ${o.id}</strong></div>
                 <div class="centro"><small>(não é venda – sem valor fiscal)</small></div>
                 <hr>
-                <div>Cliente: ${o.cliente}</div>
-                ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
-                ${o.endereco ? `<div>Entrega: ${o.endereco}</div>` : ''}
+                <div>Cliente: ${escapar(o.cliente)}</div>
+                ${o.telefone ? `<div>Telefone: ${escapar(o.telefone)}</div>` : ''}
+                ${o.endereco ? `<div>Entrega: ${escapar(o.endereco)}</div>` : ''}
                 <div>Data: ${o.data}</div>
-                ${o.vendedor ? `<div>Atendido por: ${o.vendedor}</div>` : ''}
+                ${o.vendedor ? `<div>Atendido por: ${escapar(o.vendedor)}</div>` : ''}
                 <div><strong>Válido até: ${o.valido_ate}</strong></div>
                 <hr>
                 <table>${linhas}</table>
@@ -615,7 +616,7 @@
                     document.getElementById('telefone').value = o.telefone;
                     document.getElementById('endereco').value = o.endereco || '';
                     const banner = document.getElementById('bannerOrcamento');
-                    banner.innerHTML = `📄 <strong>Venda do orçamento nº ${o.id}</strong> – cliente <strong>${o.cliente}</strong>
+                    banner.innerHTML = `📄 <strong>Venda do orçamento nº ${o.id}</strong> – cliente <strong>${escapar(o.cliente)}</strong>
                         (feito em ${o.data}). Os preços do orçamento foram mantidos.
                         <button class="btn-limpar" onclick="limparCarrinho()">Sair do orçamento</button>`;
                     banner.style.display = 'block';
@@ -658,22 +659,25 @@
         // Só o administrador vê o botão de cancelar venda
         const EH_ADMIN = {{ 'true' if admin else 'false' }};
 
+        let listaVendas = [];
+
         function carregarVendas() {
             fetch('/api/vendas')
                 .then(r => r.json())
                 .then(vendas => {
+                    listaVendas = vendas;
                     let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Pagamento</th><th>Vendedor</th><th>Cliente</th><th>Data</th><th>Ação</th></tr>';
                     vendas.forEach(v => {
                         html += `<tr>
                             <td>${v.id}</td>
-                            <td>${v.produto}</td>
-                            <td>${v.quantidade} ${v.unidade}</td>
+                            <td>${escapar(v.produto)}</td>
+                            <td>${v.quantidade} ${escapar(v.unidade)}</td>
                             <td>${dinheiro(v.valor_total)}</td>
-                            <td>${v.forma_pagamento || '-'}</td>
-                            <td>${v.vendedor || '-'}</td>
-                            <td>${v.cliente || '-'}${v.endereco_entrega ? '<br><small>🚚 ' + v.endereco_entrega + '</small>' : ''}</td>
+                            <td>${escapar(v.forma_pagamento) || '-'}</td>
+                            <td>${escapar(v.vendedor) || '-'}</td>
+                            <td>${escapar(v.cliente) || '-'}${v.endereco_entrega ? '<br><small>🚚 ' + escapar(v.endereco_entrega) + '</small>' : ''}</td>
                             <td>${v.data}</td>
-                            <td>${EH_ADMIN ? `<button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button>` : '-'}</td>
+                            <td>${EH_ADMIN ? `<button class="btn-cancelar" onclick="cancelarVenda(${v.id})">Cancelar</button>` : '-'}</td>
                         </tr>`;
                     });
                     document.getElementById('tabelaVendas').innerHTML = html;
@@ -681,7 +685,10 @@
         }
 
         // Cancelar uma venda: devolve os produtos ao estoque
-        function cancelarVenda(id, produto, quantidade) {
+        function cancelarVenda(id) {
+            const v = listaVendas.find(item => item.id === id);
+            const produto = v ? v.produto : '';
+            const quantidade = v ? v.quantidade : '';
             if (!confirm(`Cancelar a venda nº ${id}?\n\n${quantidade} x ${produto} vão VOLTAR para o estoque.`)) return;
             fetch('/api/vendas/' + id, {method: 'DELETE'})
                 .then(r => r.json())
@@ -720,7 +727,7 @@
                 .then(clientes => {
                     listaClientes = clientes;
                     document.getElementById('listaClientes').innerHTML = clientes
-                        .map(c => `<option value="${c.nome}">${c.telefone || ''}</option>`).join('');
+                        .map(c => `<option value="${escapar(c.nome)}">${escapar(c.telefone) || ''}</option>`).join('');
                 });
         }
         document.getElementById('cliente').addEventListener('input', () => {

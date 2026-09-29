@@ -55,6 +55,7 @@
     <h2>Usuários cadastrados</h2>
     <table id="tabelaUsuarios"></table>
 
+    <script src="{{ url_for('static', filename='js/escapar.js') }}"></script>
     <script>
 
         // ---------- CAMPO DE SENHA "SEGURO" ----------
@@ -119,8 +120,8 @@
                                <button onclick="bloquear(${u.id})">${u.ativo ? 'Bloquear' : 'Desbloquear'}</button>
                                <button onclick="excluir(${u.id})">Excluir</button>`;
                         html += `<tr>
-                            <td>${u.nome}</td>
-                            <td>${u.email}</td>
+                            <td>${escapar(u.nome)}</td>
+                            <td>${escapar(u.email)}</td>
                             ${tipo}
                             ${situacao}
                             <td>${u.criado_em}</td>

@@ -101,6 +101,19 @@ def conferir_login():
     return None
 
 
+# ---------- LEITURA SEGURA DO JSON ----------
+
+def dados_requisicao():
+    """Lê o JSON do corpo do pedido com segurança.
+    Devolve o dicionário de dados, ou None se o corpo estiver ausente,
+    vazio ou mal formatado (evita que a rota quebre com erro 500)."""
+    dados = request.get_json(silent=True)
+    return dados if isinstance(dados, dict) else None
+
+
+MENSAGEM_JSON_INVALIDO = 'Não foi possível ler os dados enviados. Recarregue a página e tente novamente.'
+
+
 @app.context_processor
 def dados_para_as_telas():
     """Deixa o usuário logado disponível em todas as telas (menu, botões)."""
@@ -231,7 +244,11 @@ def clientes():
     session = Session()
 
     if request.method == 'POST':
-        erro, limpos = validar_cliente(request.json or {})
+        dados = dados_requisicao()
+        if dados is None:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
+        erro, limpos = validar_cliente(dados)
         if erro:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': erro})
@@ -267,7 +284,11 @@ def alterar_cliente(id):
         session.close()
         return jsonify({'sucesso': True})
 
-    erro, limpos = validar_cliente(request.json or {})
+    dados = dados_requisicao()
+    if dados is None:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
+    erro, limpos = validar_cliente(dados)
     if erro:
         session.close()
         return jsonify({'sucesso': False, 'mensagem': erro})
@@ -317,7 +338,11 @@ def usuarios():
     session = Session()
 
     if request.method == 'POST':
-        erro, limpos = validar_usuario(session, request.json or {})
+        dados = dados_requisicao()
+        if dados is None:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
+        erro, limpos = validar_usuario(session, dados)
         if erro:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': erro})
@@ -357,7 +382,10 @@ def alterar_usuario(id):
         return jsonify({'sucesso': True})
 
     # Editar usuário (a senha só muda se for digitada uma nova)
-    dados = request.json or {}
+    dados = dados_requisicao()
+    if dados is None:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
     erro, limpos = validar_usuario(session, dados, id_atual=id, senha_obrigatoria=False)
     if erro:
         session.close()
@@ -467,7 +495,11 @@ def produtos():
 
     # Cadastrar um produto novo
     if request.method == 'POST':
-        erro, limpos = validar_produto(request.json)
+        dados = dados_requisicao()
+        if dados is None:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
+        erro, limpos = validar_produto(dados)
         if erro:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': erro})
@@ -508,7 +540,11 @@ def editar_produto(id):
         session.close()
         return jsonify({'sucesso': False, 'mensagem': 'Produto não encontrado.'})
 
-    erro, limpos = validar_produto(request.json)
+    dados = dados_requisicao()
+    if dados is None:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
+    erro, limpos = validar_produto(dados)
     if erro:
         session.close()
         return jsonify({'sucesso': False, 'mensagem': erro})
@@ -550,8 +586,12 @@ def entrada_estoque(id):
         session.close()
         return jsonify({'sucesso': False, 'mensagem': 'Produto não encontrado.'})
 
+    dados = dados_requisicao()
+    if dados is None:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
     try:
-        quantidade = int(request.json.get('quantidade'))
+        quantidade = int(dados.get('quantidade'))
     except (TypeError, ValueError):
         session.close()
         return jsonify({'sucesso': False, 'mensagem': 'Digite uma quantidade válida (número inteiro).'})
@@ -605,9 +645,16 @@ def vendas():
 
     # Registrar uma nova venda (e descontar do estoque)
     if request.method == 'POST':
-        dados = request.json
-        produto_id = int(dados['produto_id'])
-        quantidade = int(dados['quantidade'])
+        dados = dados_requisicao()
+        if dados is None:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
+        try:
+            produto_id = int(dados['produto_id'])
+            quantidade = int(dados['quantidade'])
+        except (KeyError, TypeError, ValueError):
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Dados de venda inválidos.'}), 400
 
         produto = session.query(Produto).filter_by(id=produto_id).first()
 
@@ -676,21 +723,25 @@ def finalizar_pedido():
     """Venda com vários itens (carrinho): confere o estoque de todos,
     dá baixa em tudo de uma vez e devolve os dados do comprovante."""
     session = Session()
-    itens = (request.json or {}).get('itens', [])
-    orcamento_id = (request.json or {}).get('orcamento_id')
-    cliente_nome, cliente_telefone, cliente_endereco, cliente_id = dados_do_cliente(session, request.json or {})
+    dados = dados_requisicao()
+    if dados is None:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
+    itens = dados.get('itens', [])
+    orcamento_id = dados.get('orcamento_id')
+    cliente_nome, cliente_telefone, cliente_endereco, cliente_id = dados_do_cliente(session, dados)
 
     if not telefone_valido(cliente_telefone):
         session.close()
         return jsonify({'sucesso': False, 'mensagem': MENSAGEM_TELEFONE})
 
     # Forma de pagamento (obrigatória)
-    forma_pagamento = str((request.json or {}).get('forma_pagamento') or '').strip().upper()
+    forma_pagamento = str(dados.get('forma_pagamento') or '').strip().upper()
     if forma_pagamento not in FORMAS_PAGAMENTO:
         session.close()
         return jsonify({'sucesso': False, 'mensagem': 'Escolha a forma de pagamento.'})
     valor_recebido = None
-    texto_recebido = str((request.json or {}).get('valor_recebido') or '').strip().replace(',', '.')
+    texto_recebido = str(dados.get('valor_recebido') or '').strip().replace(',', '.')
     if forma_pagamento == 'DINHEIRO' and texto_recebido:
         try:
             valor_recebido = float(texto_recebido)
@@ -734,7 +785,12 @@ def finalizar_pedido():
     orcamento = None
     precos_orcamento = {}
     if orcamento_id:
-        orcamento = session.query(Orcamento).filter_by(id=int(orcamento_id)).first()
+        try:
+            orcamento_id = int(orcamento_id)
+        except (TypeError, ValueError):
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Orçamento inválido.'}), 400
+        orcamento = session.query(Orcamento).filter_by(id=orcamento_id).first()
         if not orcamento:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': 'Orçamento não encontrado.'})
@@ -747,7 +803,7 @@ def finalizar_pedido():
             precos_orcamento[item.produto_id] = item.preco
 
     # Desconto (em %): só no DINHEIRO ou PIX; balcão até 5%
-    texto_desconto = str((request.json or {}).get('desconto_percentual') or '').strip().replace(',', '.')
+    texto_desconto = str(dados.get('desconto_percentual') or '').strip().replace(',', '.')
     try:
         desconto_percentual = float(texto_desconto) if texto_desconto else 0.0
     except ValueError:
@@ -876,7 +932,10 @@ def orcamentos():
 
     # Criar um orçamento novo (NÃO mexe no estoque)
     if request.method == 'POST':
-        dados = request.json or {}
+        dados = dados_requisicao()
+        if dados is None:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': MENSAGEM_JSON_INVALIDO}), 400
         cliente = str(dados.get('cliente', '')).strip().upper()
         telefone = str(dados.get('telefone', '')).strip()
         endereco = str(dados.get('endereco', '') or '').strip().upper()

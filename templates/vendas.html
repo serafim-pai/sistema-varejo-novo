@@ -74,6 +74,10 @@
                         padding: 4px 8px; margin-left: 4px; }
         .maiusculo { text-transform: uppercase; }
         #areaDinheiro { display: none; margin-top: 6px; }
+        #areaDesconto { display: none; margin-top: 6px; background: #fff8e1; border: 1px dashed #f0a500;
+                        border-radius: 6px; padding: 4px 8px; }
+        #descontoPct, #descontoValor { width: 90px; }
+        #resumoDesconto { font-size: 16px; color: #8a3200; margin: 4px 0; display: none; }
         #valorRecebido { width: 140px; font-size: 16px; }
         #troco { font-size: 20px; font-weight: bold; margin-left: 10px; }
         .validade { background: #fff; border: 1px dashed #c9b6f0; border-radius: 6px; padding: 4px 8px; margin-top: 6px; display: inline-block; }
@@ -103,6 +107,7 @@
     <div class="carrinho">
         <h2>🛒 2. Carrinho</h2>
         <div id="listaCarrinho"></div>
+        <div id="resumoDesconto"></div>
         <div class="total">TOTAL: <span id="totalCarrinho">R$ 0.00</span></div>
         <div class="cliente">
             <div><strong>👤 Cliente</strong> <small>(opcional na venda; no orçamento, o nome é obrigatório)</small></div>
@@ -135,6 +140,12 @@
                     ou
                     <button type="button" data-forma="CARTÃO DE CRÉDITO" onclick="escolherPagamento('CARTÃO DE CRÉDITO')">CRÉDITO</button>
                 </span>
+            </div>
+            <div id="areaDesconto">
+                <label><strong>🏷️ Desconto:</strong></label>
+                <input type="number" id="descontoPct" step="0.01" min="0" placeholder="%" autocomplete="off"> %
+                &nbsp;ou&nbsp; R$ <input type="number" id="descontoValor" step="0.01" min="0" placeholder="R$" autocomplete="off">
+                <small>{{ '(administrador: sem limite)' if admin else '(máximo 5%, só no dinheiro ou Pix)' }}</small>
             </div>
             <div id="areaDinheiro">
                 <label><strong>💵 Valor recebido:</strong></label>
@@ -262,6 +273,7 @@
             if (carrinho.length === 0) {
                 area.innerHTML = '<p class="vazio">O carrinho está vazio. Adicione os produtos acima.</p>';
                 document.getElementById('totalCarrinho').textContent = dinheiro(0);
+                atualizarDesconto();
                 return;
             }
 
@@ -279,8 +291,7 @@
             });
             html += '</table>';
             area.innerHTML = html;
-            document.getElementById('totalCarrinho').textContent = dinheiro(total);
-            calcularTroco();
+            atualizarDesconto();
         }
 
         // ---------- Finalizar e comprovante ----------
@@ -296,7 +307,9 @@
                 b.classList.toggle('escolhida', b.id === 'btnCartao'));
             document.getElementById('opcoesCartao').style.display = 'inline';
             document.getElementById('areaDinheiro').style.display = 'none';
-            calcularTroco();
+            document.getElementById('areaDesconto').style.display = 'none';
+            limparDesconto();
+            atualizarDesconto();
         }
 
         function escolherPagamento(forma) {
@@ -307,12 +320,83 @@
             document.getElementById('opcoesCartao').style.display = cartao ? 'inline' : 'none';
             const dinheiro = forma === 'DINHEIRO';
             document.getElementById('areaDinheiro').style.display = dinheiro ? 'block' : 'none';
+            // Desconto só aparece no DINHEIRO ou PIX
+            document.getElementById('areaDesconto').style.display = aceitaDesconto() ? 'block' : 'none';
+            if (!aceitaDesconto()) limparDesconto();
             if (dinheiro) document.getElementById('valorRecebido').focus();
-            calcularTroco();
+            atualizarDesconto();
         }
+
+        const EH_ADMIN_DESCONTO = {{ 'true' if admin else 'false' }};
+        const DESCONTO_MAXIMO = EH_ADMIN_DESCONTO ? 99.99 : 5;
 
         function totalDoCarrinho() {
             return carrinho.reduce((soma, i) => soma + i.quantidade * i.preco, 0);
+        }
+
+        function aceitaDesconto() {
+            return formaPagamento === 'DINHEIRO' || formaPagamento === 'PIX';
+        }
+
+        // Porcentagem de desconto digitada (0 se não pode ter desconto)
+        function descontoPercentual() {
+            if (!aceitaDesconto()) return 0;
+            const pct = parseFloat(document.getElementById('descontoPct').value.replace(',', '.'));
+            return isNaN(pct) || pct < 0 ? 0 : pct;
+        }
+
+        function valorDoDesconto() {
+            return Math.round(totalDoCarrinho() * descontoPercentual()) / 100;
+        }
+
+        // Total que o cliente vai pagar (já com desconto)
+        function totalAPagar() {
+            return totalDoCarrinho() - valorDoDesconto();
+        }
+
+        // Atualiza o total da tela, a linha do desconto e o troco
+        function atualizarDesconto() {
+            const subtotal = totalDoCarrinho();
+            const resumo = document.getElementById('resumoDesconto');
+            const pct = descontoPercentual();
+            if (pct > 0 && subtotal > 0) {
+                resumo.style.display = 'block';
+                resumo.innerHTML = `Subtotal: ${dinheiro(subtotal)} &nbsp;|&nbsp; 🏷️ Desconto ${pct.toFixed(2)}%: <strong>- ${dinheiro(valorDoDesconto())}</strong>`;
+            } else {
+                resumo.style.display = 'none';
+            }
+            document.getElementById('totalCarrinho').textContent = dinheiro(totalAPagar());
+            calcularTroco();
+        }
+
+        // Digitou a %: calcula o valor em R$
+        function descontoPorPercentual() {
+            const pct = descontoPercentual();
+            document.getElementById('descontoValor').value = pct > 0 ? valorDoDesconto().toFixed(2) : '';
+            avisarLimite(pct);
+            atualizarDesconto();
+        }
+
+        // Digitou o valor em R$: calcula a %
+        function descontoPorValor() {
+            const valor = parseFloat(document.getElementById('descontoValor').value.replace(',', '.'));
+            const subtotal = totalDoCarrinho();
+            const pct = (!isNaN(valor) && valor > 0 && subtotal > 0) ? (valor / subtotal * 100) : 0;
+            document.getElementById('descontoPct').value = pct > 0 ? pct.toFixed(2) : '';
+            avisarLimite(pct);
+            atualizarDesconto();
+        }
+
+        function avisarLimite(pct) {
+            const passou = pct > DESCONTO_MAXIMO + 0.001;
+            document.getElementById('descontoPct').classList.toggle('campo-erro', passou);
+            document.getElementById('descontoValor').classList.toggle('campo-erro', passou);
+        }
+
+        function limparDesconto() {
+            document.getElementById('descontoPct').value = '';
+            document.getElementById('descontoValor').value = '';
+            avisarLimite(0);
         }
 
         // Dinheiro: mostra o troco enquanto digita o valor recebido
@@ -320,7 +404,7 @@
             const campo = document.getElementById('troco');
             const recebido = parseFloat(document.getElementById('valorRecebido').value.replace(',', '.'));
             if (formaPagamento !== 'DINHEIRO' || isNaN(recebido)) { campo.textContent = ''; return; }
-            const troco = recebido - totalDoCarrinho();
+            const troco = recebido - totalAPagar();
             campo.style.color = troco < 0 ? '#b00020' : '#155724';
             campo.textContent = troco < 0
                 ? `Faltam ${dinheiro(-troco)}`
@@ -334,6 +418,9 @@
             document.getElementById('valorRecebido').value = '';
             document.getElementById('areaDinheiro').style.display = 'none';
             document.getElementById('troco').textContent = '';
+            document.getElementById('areaDesconto').style.display = 'none';
+            limparDesconto();
+            atualizarDesconto();
         }
 
         function finalizarVenda() {
@@ -344,15 +431,28 @@
                     : 'Escolha a forma de pagamento.');
                 return;
             }
+            const telefone = document.getElementById('telefone').value;
+            if (telefone && !TELEFONE_OK.test(telefone)) {
+                alert('Telefone inválido. Use o DDD entre parênteses e 9 números. Ex.: (11) 98888-7777');
+                document.getElementById('telefone').focus();
+                return;
+            }
+            const pct = descontoPercentual();
+            if (pct > DESCONTO_MAXIMO + 0.001) {
+                alert(`O desconto máximo no balcão é 5%. Acima disso, chame o administrador.`);
+                document.getElementById('descontoPct').focus();
+                return;
+            }
             const recebidoTexto = document.getElementById('valorRecebido').value;
             if (formaPagamento === 'DINHEIRO' && recebidoTexto) {
                 const recebido = parseFloat(recebidoTexto.replace(',', '.'));
-                if (recebido < totalDoCarrinho()) {
-                    alert(`O valor recebido é menor que o total (${dinheiro(totalDoCarrinho())}).`);
+                if (recebido + 0.001 < totalAPagar()) {
+                    alert(`O valor recebido é menor que o total (${dinheiro(totalAPagar())}).`);
                     return;
                 }
             }
-            if (!confirm(`Finalizar a venda?\n\nTotal: ${dinheiro(totalDoCarrinho())}\nPagamento: ${formaPagamento}`)) return;
+            const textoDesconto = pct > 0 ? `\nDesconto: ${pct.toFixed(2)}% (- ${dinheiro(valorDoDesconto())})` : '';
+            if (!confirm(`Finalizar a venda?\n\nTotal: ${dinheiro(totalAPagar())}${textoDesconto}\nPagamento: ${formaPagamento}`)) return;
 
             fetch('/api/pedidos', {
                 method: 'POST',
@@ -364,6 +464,7 @@
                     telefone: document.getElementById('telefone').value,
                     endereco: document.getElementById('endereco').value,
                     forma_pagamento: formaPagamento,
+                    desconto_percentual: pct,
                     valor_recebido: formaPagamento === 'DINHEIRO' ? recebidoTexto : ''
                 })
             }).then(r => r.json()).then(res => {
@@ -401,6 +502,8 @@
                 <hr>
                 <table>${linhas}</table>
                 <hr>
+                ${res.desconto > 0 ? `<div class="direita">Subtotal: ${dinheiro(res.subtotal)}</div>
+                <div class="direita">Desconto (${res.desconto_percentual.toFixed(2)}%): - ${dinheiro(res.desconto)}</div>` : ''}
                 <div class="total-cupom">TOTAL: ${dinheiro(res.total)}</div>
                 <div>Pagamento: <strong>${res.forma_pagamento}</strong></div>
                 ${res.valor_recebido !== null ? `<div>Valor recebido: ${dinheiro(res.valor_recebido)}</div>
@@ -428,6 +531,11 @@
             if (!cliente) {
                 alert('Campo obrigatório: digite o nome do cliente.');
                 document.getElementById('cliente').focus();
+                return;
+            }
+            if (telefone && !TELEFONE_OK.test(telefone)) {
+                alert('Telefone inválido. Use o DDD entre parênteses e 9 números. Ex.: (11) 98888-7777');
+                document.getElementById('telefone').focus();
                 return;
             }
             if (!validade) {
@@ -620,6 +728,21 @@
         });
 
         document.getElementById('valorRecebido').addEventListener('input', calcularTroco);
+        document.getElementById('descontoPct').addEventListener('input', descontoPorPercentual);
+        document.getElementById('descontoValor').addEventListener('input', descontoPorValor);
+
+        // Telefone: (DDD) + 9 números, ex.: (11) 98888-7777. A máscara coloca os sinais sozinha.
+        const TELEFONE_OK = /^\(\d{2}\) \d{5}-\d{4}$/;
+        function mascaraTelefone(campo) {
+            const n = campo.value.replace(/\D/g, '').slice(0, 11);
+            let t = n;
+            if (n.length > 0) t = '(' + n.slice(0, 2);
+            if (n.length >= 2) t += ') ' + n.slice(2, 7);
+            if (n.length > 7) t += '-' + n.slice(7);
+            campo.value = t;
+        }
+        document.getElementById('telefone').addEventListener('input', e => mascaraTelefone(e.target));
+        document.getElementById('telefone').placeholder = '(DDD) 9XXXX-XXXX';
         document.getElementById('valorRecebido').addEventListener('keydown', evento => {
             if (evento.key === 'Enter') finalizarVenda();
         });

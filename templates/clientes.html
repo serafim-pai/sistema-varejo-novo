@@ -32,7 +32,7 @@
     <div id="formulario">
         <h2 id="tituloFormulario">Novo Cliente</h2>
         <input type="text" id="nome" placeholder="Nome *" autocomplete="off">
-        <input type="text" id="telefone" placeholder="Telefone" autocomplete="off">
+        <input type="text" id="telefone" placeholder="(DDD) 9XXXX-XXXX" autocomplete="off">
         <input type="text" id="documento" placeholder="CPF ou CNPJ (opcional)" autocomplete="off">
         <input type="text" id="endereco" placeholder="Endereço (rua, número, bairro)" autocomplete="off">
         <button id="btnSalvar" onclick="salvarCliente()">Cadastrar</button>
@@ -159,6 +159,18 @@
                 if (proximo) document.getElementById(proximo).focus();
                 else salvarCliente();
             });
+            // Telefone: (DDD) + 9 números, os sinais entram sozinhos
+            if (campo === 'telefone') {
+                caixa.addEventListener('input', () => {
+                    const n = caixa.value.replace(/\D/g, '').slice(0, 11);
+                    let t = n;
+                    if (n.length > 0) t = '(' + n.slice(0, 2);
+                    if (n.length >= 2) t += ') ' + n.slice(2, 7);
+                    if (n.length > 7) t += '-' + n.slice(7);
+                    caixa.value = t;
+                });
+                return;
+            }
             // Tudo o que for digitado vira LETRA MAIÚSCULA
             caixa.addEventListener('input', () => {
                 const pos = caixa.selectionStart;

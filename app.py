@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, jsonify, redirect
 from flask import session as login          # "login" guarda quem está usando o sistema
 from werkzeug.security import generate_password_hash, check_password_hash
-from database import Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, Cliente, UNIDADES, FORMAS_PAGAMENTO
+from database import (Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, Cliente, UNIDADES,
+                      FORMAS_PAGAMENTO, FORMAS_COM_DESCONTO, DESCONTO_MAXIMO_BALCAO)
+import re
 from datetime import datetime, timedelta
 import os
 import secrets
@@ -209,8 +211,8 @@ def validar_cliente(dados):
 
     if sum(1 for letra in nome if letra.isalpha()) < 2:
         return 'Digite o nome do cliente.', None
-    if telefone and sum(1 for c in telefone if c.isdigit()) < 8:
-        return 'O telefone precisa ter pelo menos 8 números.', None
+    if not telefone_valido(telefone):
+        return MENSAGEM_TELEFONE, None
     if documento:
         numeros = ''.join(c for c in documento if c.isdigit())
         if len(numeros) not in (11, 14):
@@ -568,6 +570,14 @@ def entrada_estoque(id):
 
 # ---------- API DE VENDAS ----------
 
+def telefone_valido(telefone):
+    """Telefone no formato (DDD) + 9 números. Ex.: (11) 98888-7777. Vazio também vale."""
+    return not telefone or re.fullmatch(r'\(\d{2}\) \d{5}-\d{4}', telefone) is not None
+
+
+MENSAGEM_TELEFONE = 'Telefone inválido. Use o DDD entre parênteses e 9 números. Ex.: (11) 98888-7777'
+
+
 def dados_do_cliente(session, dados):
     """Lê o cliente da venda (tudo opcional). Se o nome for de um cliente cadastrado,
     liga a venda a ele. Devolve (nome, telefone, endereco, cliente_id)."""
@@ -631,7 +641,8 @@ def vendas():
             'data': v.data.strftime('%d/%m/%Y %H:%M'),
             'cliente': v.cliente or '',
             'endereco_entrega': v.endereco_entrega or '',
-            'forma_pagamento': v.forma_pagamento or ''
+            'forma_pagamento': v.forma_pagamento or '',
+            'desconto': v.desconto or 0
         })
     session.close()
     return jsonify(resultado)
@@ -665,6 +676,10 @@ def finalizar_pedido():
     itens = (request.json or {}).get('itens', [])
     orcamento_id = (request.json or {}).get('orcamento_id')
     cliente_nome, cliente_telefone, cliente_endereco, cliente_id = dados_do_cliente(session, request.json or {})
+
+    if not telefone_valido(cliente_telefone):
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': MENSAGEM_TELEFONE})
 
     # Forma de pagamento (obrigatória)
     forma_pagamento = str((request.json or {}).get('forma_pagamento') or '').strip().upper()
@@ -728,9 +743,33 @@ def finalizar_pedido():
         for item in session.query(OrcamentoItem).filter_by(orcamento_id=orcamento.id).all():
             precos_orcamento[item.produto_id] = item.preco
 
+    # Desconto (em %): só no DINHEIRO ou PIX; balcão até 5%
+    texto_desconto = str((request.json or {}).get('desconto_percentual') or '').strip().replace(',', '.')
+    try:
+        desconto_percentual = float(texto_desconto) if texto_desconto else 0.0
+    except ValueError:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Digite um desconto válido.'})
+    if desconto_percentual < 0:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'O desconto não pode ser negativo.'})
+    if desconto_percentual > 0 and forma_pagamento not in FORMAS_COM_DESCONTO:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Desconto só no pagamento em DINHEIRO ou PIX.'})
+    if not eh_admin() and desconto_percentual > DESCONTO_MAXIMO_BALCAO + 0.001:
+        session.close()
+        return jsonify({'sucesso': False,
+                        'mensagem': f'O desconto máximo no balcão é {DESCONTO_MAXIMO_BALCAO:.0f}%. Acima disso, chame o administrador.'})
+    if desconto_percentual >= 100:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'O desconto precisa ser menor que 100%.'})
+
+    total_bruto = sum(q * precos_orcamento.get(pid, produtos[pid].preco) for pid, q in quantidades.items())
+    desconto_valor = round(total_bruto * desconto_percentual / 100, 2)
+    total_previsto = total_bruto - desconto_valor
+
     # Confere se o dinheiro recebido dá para pagar (antes de mexer no estoque)
     if valor_recebido is not None:
-        total_previsto = sum(q * precos_orcamento.get(pid, produtos[pid].preco) for pid, q in quantidades.items())
         if valor_recebido + 0.001 < total_previsto:
             session.close()
             return jsonify({'sucesso': False,
@@ -739,15 +778,16 @@ def finalizar_pedido():
     # 2) Tudo certo: dá baixa no estoque e registra as vendas
     agora = datetime.now()
     comprovante = []
-    total = 0.0
     ids = []
     for produto_id, quantidade in quantidades.items():
         produto = produtos[produto_id]
         preco = precos_orcamento.get(produto_id, produto.preco)
         subtotal = quantidade * preco
+        # O desconto é dividido entre os itens, na mesma proporção
+        desconto_item = subtotal * desconto_percentual / 100
         produto.quantidade -= quantidade
         venda = Venda(produto_id=produto_id, quantidade=quantidade,
-                      valor_total=subtotal, data=agora,
+                      valor_total=subtotal - desconto_item, desconto=desconto_item, data=agora,
                       custo_total=custo_da_venda(produto, quantidade),
                       cliente_id=cliente_id, cliente=cliente_nome,
                       telefone=cliente_telefone, endereco_entrega=cliente_endereco,
@@ -758,7 +798,8 @@ def finalizar_pedido():
         comprovante.append({'produto': produto.nome, 'quantidade': quantidade,
                             'unidade': produto.unidade or 'UN',
                             'preco': preco, 'subtotal': subtotal})
-        total += subtotal
+
+    total = total_previsto
 
     if orcamento:
         orcamento.situacao = 'VIROU VENDA'
@@ -771,6 +812,9 @@ def finalizar_pedido():
         'numero': min(ids),
         'data': agora.strftime('%d/%m/%Y %H:%M'),
         'itens': comprovante,
+        'subtotal': total_bruto,
+        'desconto': desconto_valor,
+        'desconto_percentual': desconto_percentual,
         'total': total,
         'cliente': cliente_nome or '',
         'telefone': cliente_telefone or '',
@@ -846,6 +890,9 @@ def orcamentos():
         if sum(1 for letra in cliente if letra.isalpha()) < 2:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': 'Digite o nome do cliente.'})
+        if not telefone_valido(telefone):
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': MENSAGEM_TELEFONE})
         if not itens:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': 'O carrinho está vazio.'})

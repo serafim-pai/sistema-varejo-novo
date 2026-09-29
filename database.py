@@ -10,6 +10,10 @@ Session = sessionmaker(bind=engine)
 # Formas de pagamento aceitas (sem fiado)
 FORMAS_PAGAMENTO = ['DINHEIRO', 'PIX', 'CARTÃO DE DÉBITO', 'CARTÃO DE CRÉDITO']
 
+# Desconto: só no DINHEIRO ou PIX. O balcão pode dar até 5%; o administrador, mais.
+FORMAS_COM_DESCONTO = ['DINHEIRO', 'PIX']
+DESCONTO_MAXIMO_BALCAO = 5.0
+
 # Unidades de medida que o sistema aceita
 UNIDADES = ['UN', 'SACO', 'M³', 'M²', 'M', 'KG', 'MILHEIRO', 'LATA', 'CAIXA', 'BARRA', 'ROLO', 'LITRO']
 
@@ -68,6 +72,7 @@ class Venda(Base):
     telefone = Column(String(30), nullable=True)
     endereco_entrega = Column(String(200), nullable=True)
     forma_pagamento = Column(String(30), nullable=True)   # DINHEIRO, PIX, CARTÃO DE DÉBITO, CARTÃO DE CRÉDITO
+    desconto = Column(Float, nullable=True)                # desconto em R$ dado neste item (valor_total já vem descontado)
 
 
 class Orcamento(Base):
@@ -127,6 +132,7 @@ novas_colunas = [
     ('vendas', 'telefone', 'VARCHAR(30)'),
     ('vendas', 'endereco_entrega', 'VARCHAR(200)'),
     ('vendas', 'forma_pagamento', 'VARCHAR(30)'),
+    ('vendas', 'desconto', 'FLOAT'),
     ('orcamentos', 'endereco', 'VARCHAR(200)'),
 ]
 for tabela, coluna, tipo in novas_colunas:

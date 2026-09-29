@@ -22,12 +22,8 @@
     </style>
 </head>
 <body>
-    <nav>
-        <a href="/">Produtos</a>
-        <a href="/vendas">Vendas</a>
-        <a href="/orcamentos">Orçamentos</a>
-        <a href="/relatorios" class="ativo">Relatórios</a>
-    </nav>
+    {% set pagina = 'relatorios' %}
+    {% include '_menu.html' %}
 
     <h1>Relatórios</h1>
 

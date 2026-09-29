@@ -64,12 +64,8 @@
     </style>
 </head>
 <body>
-    <nav>
-        <a href="/">Produtos</a>
-        <a href="/vendas">Vendas</a>
-        <a href="/orcamentos" class="ativo">Orçamentos</a>
-        <a href="/relatorios">Relatórios</a>
-    </nav>
+    {% set pagina = 'orcamentos' %}
+    {% include '_menu.html' %}
 
     <h1>📄 Orçamentos</h1>
     <p>Para fazer um orçamento novo, vá em <a href="/vendas"><strong>Vendas</strong></a>, monte o carrinho,

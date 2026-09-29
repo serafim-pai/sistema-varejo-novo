@@ -24,34 +24,71 @@
         .aviso-alerta { background: #fff3cd; border: 2px solid #ffc107; color: #5c4400; }
         .aviso-ok { background: #d4edda; border: 2px solid #28a745; color: #155724; }
         .aviso ul { margin: 6px 0 0; padding-left: 22px; }
+        .grupo-precos { display: inline-flex; align-items: flex-end; gap: 4px; background: #fff3e0;
+                        border: 2px dashed #e65100; border-radius: 6px; padding: 4px 8px; margin: 5px; }
+        .grupo-precos label { display: block; font-size: 12px; font-weight: bold; color: #8a3200; margin-left: 5px; }
+        .grupo-precos input { width: 110px; }
+        .grupo-precos #margem { width: 70px; }
+        .sinal { font-weight: bold; color: #8a3200; padding-bottom: 14px; }
+        .btn-olho { cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+        .custo { color: #8a3200; font-weight: bold; }
+        .somente-ver { background: #e8f0fe; border: 2px solid #90b4f5; color: #1a3d7c; }
         .btn-entrada { background: #28a745; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <nav>
-        <a href="/" class="ativo">Produtos</a>
-        <a href="/vendas">Vendas</a>
-        <a href="/orcamentos">Orçamentos</a>
-        <a href="/relatorios">Relatórios</a>
-    </nav>
+    {% set pagina = 'produtos' %}
+    {% include '_menu.html' %}
 
     <h1>Cadastro de Produtos</h1>
 
     <!-- Aviso de produtos com estoque baixo ou zerado -->
     <div id="avisoEstoque" class="aviso"></div>
 
+    {% if admin %}
     <div id="formulario">
         <h2 id="tituloFormulario">Novo Produto</h2>
         <input type="text" id="nome" placeholder="Nome">
-        <input type="number" id="preco" placeholder="Preço" step="0.01">
+
+        <!-- Preços: COMPRA (escondido com *) -> % -> VENDA.
+             Digitou compra e %: o preço de venda é calculado sozinho.
+             Mudou o preço de venda: a % é recalculada. -->
+        <span class="grupo-precos">
+            <span>
+                <label for="precoCompra">Preço de compra *</label>
+                <input type="password" id="precoCompra" placeholder="******" inputmode="decimal"
+                       autocomplete="off" title="Preço de compra (fica escondido)">
+                <button type="button" class="btn-olho" id="btnOlho" onclick="mostrarCompra()" title="Mostrar / esconder">👁</button>
+            </span>
+            <span class="sinal">→</span>
+            <span>
+                <label for="margem">% lucro</label>
+                <input type="number" id="margem" placeholder="%" step="0.01">
+            </span>
+            <span class="sinal">→</span>
+            <span>
+                <label for="preco">Preço de venda</label>
+                <input type="number" id="preco" placeholder="Preço" step="0.01">
+            </span>
+        </span>
+
         <input type="number" id="quantidade" placeholder="Quantidade">
         <input type="text" id="categoria" placeholder="Categoria">
         <select id="unidade" title="Unidade de medida"></select>
         <button id="btnSalvar" onclick="salvarProduto()">Cadastrar</button>
         <button id="btnCancelar" onclick="cancelarEdicao()">Cancelar</button>
     </div>
+    {% else %}
+    <div class="aviso somente-ver">
+        👀 Você está no modo <strong>BALCÃO</strong>: pode consultar os produtos.
+        Para cadastrar ou alterar, fale com o administrador.
+    </div>
+    {% endif %}
 
     <h2>Produtos em Estoque</h2>
+    {% if admin %}
+    <p><button type="button" id="btnCustos" onclick="alternarCustos()">👁 Mostrar preço de compra e %</button></p>
+    {% endif %}
     <p class="legenda">
         <span class="estoque-ok">Verde: estoque bom (10 ou mais)</span>
         <span class="estoque-baixo">Amarelo: estoque baixo (1 a 9)</span>
@@ -73,29 +110,90 @@
             return 'estoque-ok';
         }
 
+        // Quem está usando: administrador (true) ou balcão (false)
+        const EH_ADMIN = {{ 'true' if admin else 'false' }};
+
         // Guarda o ID do produto que está sendo editado (null = cadastrando um novo)
         let idEmEdicao = null;
         let listaProdutos = [];
+        let mostrandoCustos = false;   // na tabela, o preço de compra começa escondido
+
+        // Lê um número de uma caixa (aceita vírgula). Caixa vazia = null
+        function lerNumero(id) {
+            const texto = document.getElementById(id).value.trim().replace(',', '.');
+            if (texto === '') return null;
+            const numero = parseFloat(texto);
+            return isNaN(numero) ? null : numero;
+        }
+
+        // Compra + % = preço de venda
+        function calcularVenda() {
+            const compra = lerNumero('precoCompra');
+            const margem = lerNumero('margem');
+            if (compra !== null && margem !== null) {
+                document.getElementById('preco').value = (compra * (1 + margem / 100)).toFixed(2);
+            }
+        }
+
+        // Mudou o preço de venda na mão: recalcula a %
+        function calcularMargem() {
+            const compra = lerNumero('precoCompra');
+            const venda = lerNumero('preco');
+            if (compra && compra > 0 && venda !== null) {
+                document.getElementById('margem').value = ((venda / compra - 1) * 100).toFixed(2);
+            }
+        }
+
+        // Botão 👁 do formulário: mostra ou esconde o preço de compra digitado
+        function mostrarCompra() {
+            const caixa = document.getElementById('precoCompra');
+            caixa.type = caixa.type === 'password' ? 'text' : 'password';
+        }
+
+        // Botão da tabela: mostra ou esconde a coluna de compra e %
+        function alternarCustos() {
+            mostrandoCustos = !mostrandoCustos;
+            document.getElementById('btnCustos').textContent = mostrandoCustos
+                ? '🙈 Esconder preço de compra e %'
+                : '👁 Mostrar preço de compra e %';
+            carregarProdutos();
+        }
+
+        function textoCusto(p) {
+            if (!mostrandoCustos) return '******';
+            if (p.preco_compra === null || p.preco_compra === undefined) return '-';
+            return 'R$ ' + p.preco_compra.toFixed(2);
+        }
+
+        function textoMargem(p) {
+            if (!mostrandoCustos) return '***';
+            if (p.margem === null || p.margem === undefined) return '-';
+            return p.margem.toFixed(2) + '%';
+        }
 
         function carregarProdutos() {
             fetch('/api/produtos')
                 .then(r => r.json())
                 .then(produtos => {
                     listaProdutos = produtos;
-                    let html = '<tr><th>ID</th><th>Nome</th><th>Preço</th><th>Quantidade</th><th>Unidade</th><th>Categoria</th><th>Ações</th></tr>';
+                    let html = '<tr><th>ID</th><th>Nome</th>'
+                        + (EH_ADMIN ? '<th>Compra *</th><th>%</th>' : '')
+                        + '<th>Preço</th><th>Quantidade</th><th>Unidade</th><th>Categoria</th>'
+                        + (EH_ADMIN ? '<th>Ações</th>' : '') + '</tr>';
                     produtos.forEach(p => {
                         html += `<tr>
                             <td>${p.id}</td>
                             <td>${p.nome}</td>
+                            ${EH_ADMIN ? `<td class="custo">${textoCusto(p)}</td><td class="custo">${textoMargem(p)}</td>` : ''}
                             <td>R$ ${p.preco.toFixed(2)}</td>
                             <td class="${corEstoque(p.quantidade)}">${textoQuantidade(p.quantidade)}</td>
                             <td>${p.unidade}</td>
                             <td>${p.categoria}</td>
-                            <td>
+                            ${EH_ADMIN ? `<td>
                                 <button class="btn-entrada" onclick="entradaEstoque(${p.id})">+ Entrada</button>
                                 <button onclick="editarProduto(${p.id})">Editar</button>
                                 <button onclick="deletarProduto(${p.id})">Excluir</button>
-                            </td>
+                            </td>` : ''}
                         </tr>`;
                     });
                     document.getElementById('tabelaProdutos').innerHTML = html;
@@ -105,6 +203,9 @@
 
         function limparFormulario() {
             document.getElementById('nome').value = '';
+            document.getElementById('precoCompra').value = '';
+            document.getElementById('precoCompra').type = 'password';
+            document.getElementById('margem').value = '';
             document.getElementById('preco').value = '';
             document.getElementById('quantidade').value = '';
             document.getElementById('categoria').value = '';
@@ -118,6 +219,8 @@
 
             idEmEdicao = id;
             document.getElementById('nome').value = p.nome;
+            document.getElementById('precoCompra').value = p.preco_compra ?? '';
+            document.getElementById('margem').value = p.margem ?? '';
             document.getElementById('preco').value = p.preco;
             document.getElementById('quantidade').value = p.quantidade;
             document.getElementById('categoria').value = p.categoria;
@@ -144,6 +247,8 @@
         function salvarProduto() {
             const dados = {
                 nome: document.getElementById('nome').value,
+                preco_compra: document.getElementById('precoCompra').value,
+                margem: document.getElementById('margem').value,
                 preco: document.getElementById('preco').value,
                 quantidade: document.getElementById('quantidade').value,
                 categoria: document.getElementById('categoria').value,
@@ -220,18 +325,26 @@
 
         // Tecla Enter nos campos do formulário = clicar em Cadastrar / Salvar
         // Carrega a lista de unidades de medida no campo de escolha
-        fetch('/api/unidades')
-            .then(r => r.json())
-            .then(unidades => {
-                document.getElementById('unidade').innerHTML =
-                    unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+        // (o formulário só existe para o administrador)
+        if (EH_ADMIN) {
+            fetch('/api/unidades')
+                .then(r => r.json())
+                .then(unidades => {
+                    document.getElementById('unidade').innerHTML =
+                        unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                });
+
+            ['nome', 'precoCompra', 'margem', 'preco', 'quantidade', 'categoria'].forEach(campo => {
+                document.getElementById(campo).addEventListener('keydown', evento => {
+                    if (evento.key === 'Enter') salvarProduto();
+                });
             });
 
-        ['nome', 'preco', 'quantidade', 'categoria'].forEach(campo => {
-            document.getElementById(campo).addEventListener('keydown', evento => {
-                if (evento.key === 'Enter') salvarProduto();
-            });
-        });
+            // Contas automáticas dos preços
+            document.getElementById('precoCompra').addEventListener('input', calcularVenda);
+            document.getElementById('margem').addEventListener('input', calcularVenda);
+            document.getElementById('preco').addEventListener('input', calcularMargem);
+        }
 
         carregarProdutos();
     </script>

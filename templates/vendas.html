@@ -70,12 +70,8 @@
     </style>
 </head>
 <body>
-    <nav>
-        <a href="/">Produtos</a>
-        <a href="/vendas" class="ativo">Vendas</a>
-        <a href="/orcamentos">Orçamentos</a>
-        <a href="/relatorios">Relatórios</a>
-    </nav>
+    {% set pagina = 'vendas' %}
+    {% include '_menu.html' %}
 
     <h1>Registrar Venda</h1>
 
@@ -421,6 +417,9 @@
 
         // ---------- Histórico ----------
 
+        // Só o administrador vê o botão de cancelar venda
+        const EH_ADMIN = {{ 'true' if admin else 'false' }};
+
         function carregarVendas() {
             fetch('/api/vendas')
                 .then(r => r.json())
@@ -433,7 +432,7 @@
                             <td>${v.quantidade} ${v.unidade}</td>
                             <td>${dinheiro(v.valor_total)}</td>
                             <td>${v.data}</td>
-                            <td><button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button></td>
+                            <td>${EH_ADMIN ? `<button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button>` : '-'}</td>
                         </tr>`;
                     });
                     document.getElementById('tabelaVendas').innerHTML = html;

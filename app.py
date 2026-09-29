@@ -1,8 +1,166 @@
-from flask import Flask, render_template, request, jsonify
-from database import Session, Produto, Venda, Orcamento, OrcamentoItem, UNIDADES
+from flask import Flask, render_template, request, jsonify, redirect
+from flask import session as login          # "login" guarda quem está usando o sistema
+from werkzeug.security import generate_password_hash, check_password_hash
+from database import Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, UNIDADES
 from datetime import datetime, timedelta
+import os
+import secrets
 
 app = Flask(__name__)
+
+
+# ---------- CHAVE SECRETA (protege o login) ----------
+# Na primeira vez que o sistema roda, cria o arquivo chave_secreta.txt com uma
+# chave aleatória. Esse arquivo NÃO vai para o GitHub (está no .gitignore).
+ARQUIVO_CHAVE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chave_secreta.txt')
+if not os.path.exists(ARQUIVO_CHAVE):
+    with open(ARQUIVO_CHAVE, 'w') as arquivo:
+        arquivo.write(secrets.token_hex(32))
+with open(ARQUIVO_CHAVE) as arquivo:
+    app.secret_key = arquivo.read().strip()
+
+app.permanent_session_lifetime = timedelta(hours=12)   # login vale por 12 horas
+
+
+# ---------- LOGIN: quem pode entrar e onde ----------
+
+def usuario_logado():
+    """Devolve um dicionário com os dados de quem está logado, ou None."""
+    return getattr(request, 'usuario', None)
+
+
+def eh_admin():
+    u = usuario_logado()
+    return bool(u and u['tipo'] == 'ADMIN')
+
+
+def so_admin(caminho, metodo):
+    """Diz se esta parte do sistema é só para o ADMINISTRADOR MASTER."""
+    if caminho.startswith(('/usuarios', '/api/usuarios', '/relatorios', '/api/relatorios')):
+        return True
+    # Cadastrar, editar, excluir produto e dar entrada no estoque
+    if caminho.startswith('/api/produtos') and metodo != 'GET':
+        return True
+    # Cancelar venda (devolve produto ao estoque)
+    if caminho.startswith('/api/vendas/') and metodo == 'DELETE':
+        return True
+    return False
+
+
+@app.before_request
+def conferir_login():
+    """Roda ANTES de toda página: confere se a pessoa entrou com e-mail e senha."""
+    request.usuario = None
+    caminho = request.path
+
+    if caminho.startswith('/static'):
+        return None
+
+    session = Session()
+    tem_usuarios = session.query(Usuario).count() > 0
+
+    # Sistema novo, sem nenhum usuário: manda criar o administrador master
+    if not tem_usuarios:
+        session.close()
+        if caminho == '/primeiro-acesso':
+            return None
+        if caminho.startswith('/api/'):
+            return jsonify({'sucesso': False, 'mensagem': 'Crie o administrador primeiro.'}), 401
+        return redirect('/primeiro-acesso')
+
+    if caminho in ('/login', '/primeiro-acesso'):
+        session.close()
+        return None
+
+    # Confere se quem está logado ainda existe e está ativo
+    usuario = None
+    if login.get('usuario_id'):
+        usuario = session.query(Usuario).filter_by(id=login['usuario_id'], ativo=1).first()
+    if usuario:
+        request.usuario = {'id': usuario.id, 'nome': usuario.nome,
+                           'email': usuario.email, 'tipo': usuario.tipo}
+    session.close()
+
+    if not usuario:
+        login.clear()
+        if caminho.startswith('/api/'):
+            return jsonify({'sucesso': False, 'mensagem': 'Faça login novamente.'}), 401
+        return redirect('/login')
+
+    if so_admin(caminho, request.method) and not eh_admin():
+        if caminho.startswith('/api/'):
+            return jsonify({'sucesso': False,
+                            'mensagem': 'Só o administrador pode fazer isso.'}), 403
+        return redirect('/')
+
+    return None
+
+
+@app.context_processor
+def dados_para_as_telas():
+    """Deixa o usuário logado disponível em todas as telas (menu, botões)."""
+    return {'usuario': usuario_logado(), 'admin': eh_admin()}
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def pagina_login():
+    erro = None
+    email = ''
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        senha = request.form.get('senha', '')
+        session = Session()
+        usuario = session.query(Usuario).filter_by(email=email).first()
+        if not usuario or not check_password_hash(usuario.senha_hash, senha):
+            erro = 'E-mail ou senha errados.'
+        elif not usuario.ativo:
+            erro = 'Este usuário está bloqueado. Fale com o administrador.'
+        else:
+            login.clear()
+            login.permanent = True
+            login['usuario_id'] = usuario.id
+            session.close()
+            return redirect('/')
+        session.close()
+    return render_template('login.html', modo='login', erro=erro, email=email)
+
+
+@app.route('/primeiro-acesso', methods=['GET', 'POST'])
+def primeiro_acesso():
+    """Só funciona quando ainda não existe nenhum usuário:
+    cria o ADMINISTRADOR MASTER."""
+    session = Session()
+    if session.query(Usuario).count() > 0:
+        session.close()
+        return redirect('/login')
+
+    erro = None
+    dados = {'nome': '', 'email': ''}
+    if request.method == 'POST':
+        dados = {'nome': request.form.get('nome', ''), 'email': request.form.get('email', ''),
+                 'senha': request.form.get('senha', ''), 'tipo': 'ADMIN'}
+        if request.form.get('senha', '') != request.form.get('senha2', ''):
+            erro = 'As duas senhas não são iguais.'
+        else:
+            erro, limpos = validar_usuario(session, dados)
+            if not erro:
+                usuario = Usuario(**limpos)
+                session.add(usuario)
+                session.commit()
+                login.clear()
+                login.permanent = True
+                login['usuario_id'] = usuario.id
+                session.close()
+                return redirect('/')
+    session.close()
+    return render_template('login.html', modo='primeiro', erro=erro,
+                           nome=dados.get('nome', ''), email=dados.get('email', ''))
+
+
+@app.route('/sair')
+def sair():
+    login.clear()
+    return redirect('/login')
 
 
 # ---------- PÁGINAS (telas) ----------
@@ -25,6 +183,111 @@ def pagina_relatorios():
 @app.route('/orcamentos')
 def pagina_orcamentos():
     return render_template('orcamentos.html')
+
+
+@app.route('/usuarios')
+def pagina_usuarios():
+    return render_template('usuarios.html')
+
+
+# ---------- USUÁRIOS (só o administrador master) ----------
+
+def validar_usuario(session, dados, id_atual=None, senha_obrigatoria=True):
+    """Confere os dados de um usuário. Devolve (erro, None) ou (None, dados_limpos)."""
+    nome = str(dados.get('nome', '')).strip().upper()
+    email = str(dados.get('email', '')).strip().lower()
+    senha = str(dados.get('senha', ''))
+    tipo = str(dados.get('tipo', 'SIMPLES')).strip().upper()
+
+    if sum(1 for letra in nome if letra.isalpha()) < 2:
+        return 'Digite o nome do usuário.', None
+    if '@' not in email or '.' not in email.split('@')[-1] or ' ' in email:
+        return 'Digite um e-mail válido.', None
+    if tipo not in ('ADMIN', 'SIMPLES'):
+        return 'Escolha o tipo: Administrador ou Simples.', None
+
+    repetido = session.query(Usuario).filter_by(email=email).first()
+    if repetido and repetido.id != id_atual:
+        return 'Já existe um usuário com este e-mail.', None
+
+    limpos = {'nome': nome, 'email': email, 'tipo': tipo}
+    if senha or senha_obrigatoria:
+        if len(senha) < 6:
+            return 'A senha precisa ter pelo menos 6 caracteres.', None
+        limpos['senha_hash'] = generate_password_hash(senha, method='pbkdf2:sha256')
+    return None, limpos
+
+
+def admins_ativos(session):
+    return session.query(Usuario).filter_by(tipo='ADMIN', ativo=1).count()
+
+
+@app.route('/api/usuarios', methods=['GET', 'POST'])
+def usuarios():
+    session = Session()
+
+    if request.method == 'POST':
+        erro, limpos = validar_usuario(session, request.json or {})
+        if erro:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': erro})
+        session.add(Usuario(**limpos))
+        session.commit()
+        session.close()
+        return jsonify({'sucesso': True})
+
+    todos = session.query(Usuario).order_by(Usuario.nome).all()
+    resultado = [{
+        'id': u.id, 'nome': u.nome, 'email': u.email, 'tipo': u.tipo,
+        'ativo': bool(u.ativo), 'eu': u.id == usuario_logado()['id'],
+        'criado_em': u.criado_em.strftime('%d/%m/%Y') if u.criado_em else ''
+    } for u in todos]
+    session.close()
+    return jsonify(resultado)
+
+
+@app.route('/api/usuarios/<int:id>', methods=['PUT', 'DELETE'])
+def alterar_usuario(id):
+    session = Session()
+    usuario = session.query(Usuario).filter_by(id=id).first()
+    if not usuario:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Usuário não encontrado.'})
+
+    sou_eu = usuario.id == usuario_logado()['id']
+
+    # Excluir usuário
+    if request.method == 'DELETE':
+        if sou_eu:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Você não pode excluir o seu próprio usuário.'})
+        session.delete(usuario)
+        session.commit()
+        session.close()
+        return jsonify({'sucesso': True})
+
+    # Editar usuário (a senha só muda se for digitada uma nova)
+    dados = request.json or {}
+    erro, limpos = validar_usuario(session, dados, id_atual=id, senha_obrigatoria=False)
+    if erro:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': erro})
+
+    ativo = 1 if dados.get('ativo', True) else 0
+    if sou_eu and (limpos['tipo'] != 'ADMIN' or not ativo):
+        session.close()
+        return jsonify({'sucesso': False,
+                        'mensagem': 'Você não pode tirar o seu próprio acesso de administrador.'})
+
+    usuario.nome = limpos['nome']
+    usuario.email = limpos['email']
+    usuario.tipo = limpos['tipo']
+    usuario.ativo = ativo
+    if 'senha_hash' in limpos:
+        usuario.senha_hash = limpos['senha_hash']
+    session.commit()
+    session.close()
+    return jsonify({'sucesso': True})
 
 
 # ---------- VALIDAÇÃO (usada no cadastro e na edição) ----------
@@ -67,12 +330,32 @@ def validar_produto(dados):
     if unidade not in UNIDADES:
         return 'Escolha uma unidade de medida da lista.', None
 
+    # Preço de compra e porcentagem: não são obrigatórios (podem ficar em branco)
+    preco_compra = None
+    margem = None
+    texto_compra = str(dados.get('preco_compra') or '').strip().replace(',', '.')
+    texto_margem = str(dados.get('margem') or '').strip().replace(',', '.')
+    if texto_compra:
+        try:
+            preco_compra = float(texto_compra)
+        except ValueError:
+            return 'Digite um preço de compra válido.', None
+        if preco_compra < 0:
+            return 'O preço de compra não pode ser negativo.', None
+    if texto_margem:
+        try:
+            margem = float(texto_margem)
+        except ValueError:
+            return 'Digite uma porcentagem válida.', None
+
     return None, {
         'nome': nome.upper(),
         'preco': preco,
         'quantidade': quantidade,
         'categoria': categoria.upper(),
-        'unidade': unidade
+        'unidade': unidade,
+        'preco_compra': preco_compra,
+        'margem': margem
     }
 
 
@@ -101,14 +384,22 @@ def produtos():
 
     # Listar todos os produtos
     todos_produtos = session.query(Produto).order_by(Produto.nome).all()
-    resultado = [{
-        'id': p.id,
-        'nome': p.nome,
-        'preco': p.preco,
-        'quantidade': p.quantidade,
-        'categoria': p.categoria,
-        'unidade': p.unidade or 'UN'
-    } for p in todos_produtos]
+    resultado = []
+    for p in todos_produtos:
+        item = {
+            'id': p.id,
+            'nome': p.nome,
+            'preco': p.preco,
+            'quantidade': p.quantidade,
+            'categoria': p.categoria,
+            'unidade': p.unidade or 'UN'
+        }
+        # Preço de compra e porcentagem: só vão para a tela do ADMINISTRADOR.
+        # O terminal do balcão nem recebe esses números.
+        if eh_admin():
+            item['preco_compra'] = p.preco_compra
+            item['margem'] = p.margem
+        resultado.append(item)
     session.close()
     return jsonify(resultado)
 
@@ -132,6 +423,8 @@ def editar_produto(id):
     produto.quantidade = limpos['quantidade']
     produto.categoria = limpos['categoria']
     produto.unidade = limpos['unidade']
+    produto.preco_compra = limpos['preco_compra']
+    produto.margem = limpos['margem']
     session.commit()
     session.close()
     return jsonify({'sucesso': True})

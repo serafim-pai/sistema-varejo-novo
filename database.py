@@ -20,6 +20,22 @@ class Produto(Base):
     quantidade = Column(Integer, nullable=False)
     categoria = Column(String(50), nullable=False)
     unidade = Column(String(20), nullable=False, default='UN')
+    preco_compra = Column(Float, nullable=True)   # quanto a loja pagou (só o administrador vê)
+    margem = Column(Float, nullable=True)         # porcentagem de lucro em cima do preço de compra
+
+
+class Usuario(Base):
+    """Pessoa que entra no sistema com e-mail e senha.
+    tipo = 'ADMIN' (administrador master: pode tudo) ou 'SIMPLES' (balcão: vende e orça)."""
+    __tablename__ = 'usuarios'
+
+    id = Column(Integer, primary_key=True)
+    nome = Column(String(100), nullable=False)
+    email = Column(String(120), nullable=False, unique=True)
+    senha_hash = Column(String(255), nullable=False)   # a senha nunca é guardada "aberta"
+    tipo = Column(String(10), nullable=False, default='SIMPLES')
+    ativo = Column(Integer, nullable=False, default=1)  # 1 = pode entrar, 0 = bloqueado
+    criado_em = Column(DateTime, default=datetime.now)
 
 
 class Venda(Base):
@@ -66,3 +82,11 @@ colunas = [c['name'] for c in inspect(engine).get_columns('produtos')]
 if 'unidade' not in colunas:
     with engine.begin() as conexao:
         conexao.execute(text("ALTER TABLE produtos ADD COLUMN unidade VARCHAR(20) NOT NULL DEFAULT 'UN'"))
+
+# Mesma ideia para o preço de compra e a porcentagem (produtos antigos ficam em branco)
+if 'preco_compra' not in colunas:
+    with engine.begin() as conexao:
+        conexao.execute(text("ALTER TABLE produtos ADD COLUMN preco_compra FLOAT"))
+if 'margem' not in colunas:
+    with engine.begin() as conexao:
+        conexao.execute(text("ALTER TABLE produtos ADD COLUMN margem FLOAT"))

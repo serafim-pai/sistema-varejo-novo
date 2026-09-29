@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Usuários</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        input, button, select { padding: 8px; margin: 5px; }
+        table { border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+        nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
+                letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+                padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
+        nav a:hover { background: #ff8a3d; }
+        nav a.ativo { background: #ffffff; color: #e65100; }
+        .editando { background: #fff8d6; padding: 10px; border-radius: 5px; }
+        #btnCancelar { display: none; }
+        .tipo-admin { background: #ffe0cc; color: #8a3200; font-weight: bold; }
+        .tipo-simples { background: #e8f0fe; color: #1a3d7c; font-weight: bold; }
+        .ativo-sim { color: #155724; font-weight: bold; }
+        .ativo-nao { color: #721c24; font-weight: bold; }
+        .explica { background: #f5f5f5; border-radius: 6px; padding: 10px 15px; max-width: 800px; }
+        .dica { font-size: 13px; color: #666; }
+    </style>
+</head>
+<body>
+    {% set pagina = 'usuarios' %}
+    {% include '_menu.html' %}
+
+    <h1>Usuários do Sistema</h1>
+
+    <div class="explica">
+        <strong>ADMINISTRADOR MASTER:</strong> pode tudo (produtos, preço de compra, relatórios, usuários, cancelar vendas).<br>
+        <strong>SIMPLES (balcão):</strong> faz vendas e orçamentos e consulta produtos. Não vê preço de compra nem a %.
+    </div>
+
+    <div id="formulario">
+        <h2 id="tituloFormulario">Novo Usuário</h2>
+        <input type="text" id="nome" placeholder="Nome">
+        <input type="email" id="email" placeholder="E-mail" autocomplete="off">
+        <input type="password" id="senha" placeholder="Senha (mín. 6)" autocomplete="new-password">
+        <select id="tipo">
+            <option value="SIMPLES">Simples (balcão)</option>
+            <option value="ADMIN">Administrador master</option>
+        </select>
+        <button id="btnSalvar" onclick="salvarUsuario()">Criar usuário</button>
+        <button id="btnCancelar" onclick="cancelarEdicao()">Cancelar</button>
+        <div class="dica" id="dicaSenha" style="display:none">
+            Deixe a senha em branco para manter a senha atual.
+        </div>
+    </div>
+
+    <h2>Usuários cadastrados</h2>
+    <table id="tabelaUsuarios"></table>
+
+    <script>
+        let listaUsuarios = [];
+        let idEmEdicao = null;
+
+        function carregarUsuarios() {
+            fetch('/api/usuarios')
+                .then(r => r.json())
+                .then(usuarios => {
+                    listaUsuarios = usuarios;
+                    let html = '<tr><th>Nome</th><th>E-mail</th><th>Tipo</th><th>Situação</th><th>Criado em</th><th>Ações</th></tr>';
+                    usuarios.forEach(u => {
+                        const tipo = u.tipo === 'ADMIN'
+                            ? '<td class="tipo-admin">ADMINISTRADOR</td>'
+                            : '<td class="tipo-simples">SIMPLES</td>';
+                        const situacao = u.ativo
+                            ? '<td class="ativo-sim">✅ Ativo</td>'
+                            : '<td class="ativo-nao">⛔ Bloqueado</td>';
+                        const acoes = u.eu
+                            ? `<button onclick="editarUsuario(${u.id})">Editar</button> (você)`
+                            : `<button onclick="editarUsuario(${u.id})">Editar</button>
+                               <button onclick="bloquear(${u.id})">${u.ativo ? 'Bloquear' : 'Desbloquear'}</button>
+                               <button onclick="excluir(${u.id})">Excluir</button>`;
+                        html += `<tr>
+                            <td>${u.nome}</td>
+                            <td>${u.email}</td>
+                            ${tipo}
+                            ${situacao}
+                            <td>${u.criado_em}</td>
+                            <td>${acoes}</td>
+                        </tr>`;
+                    });
+                    document.getElementById('tabelaUsuarios').innerHTML = html;
+                });
+        }
+
+        function limparFormulario() {
+            ['nome', 'email', 'senha'].forEach(c => document.getElementById(c).value = '');
+            document.getElementById('tipo').value = 'SIMPLES';
+        }
+
+        function editarUsuario(id) {
+            const u = listaUsuarios.find(item => item.id === id);
+            if (!u) return;
+            idEmEdicao = id;
+            document.getElementById('nome').value = u.nome;
+            document.getElementById('email').value = u.email;
+            document.getElementById('senha').value = '';
+            document.getElementById('senha').placeholder = 'Nova senha (opcional)';
+            document.getElementById('tipo').value = u.tipo;
+            document.getElementById('tituloFormulario').textContent = 'Editando: ' + u.nome;
+            document.getElementById('btnSalvar').textContent = 'Salvar alterações';
+            document.getElementById('btnCancelar').style.display = 'inline-block';
+            document.getElementById('dicaSenha').style.display = 'block';
+            document.getElementById('formulario').classList.add('editando');
+            window.scrollTo(0, 0);
+        }
+
+        function cancelarEdicao() {
+            idEmEdicao = null;
+            limparFormulario();
+            document.getElementById('senha').placeholder = 'Senha (mín. 6)';
+            document.getElementById('tituloFormulario').textContent = 'Novo Usuário';
+            document.getElementById('btnSalvar').textContent = 'Criar usuário';
+            document.getElementById('btnCancelar').style.display = 'none';
+            document.getElementById('dicaSenha').style.display = 'none';
+            document.getElementById('formulario').classList.remove('editando');
+        }
+
+        function enviar(url, metodo, dados, mensagemOk) {
+            return fetch(url, {
+                method: metodo,
+                headers: {'Content-Type': 'application/json'},
+                body: dados ? JSON.stringify(dados) : undefined
+            }).then(r => r.json()).then(res => {
+                if (res.sucesso) {
+                    alert(mensagemOk);
+                    cancelarEdicao();
+                    carregarUsuarios();
+                } else {
+                    alert(res.mensagem);
+                }
+            });
+        }
+
+        function salvarUsuario() {
+            const dados = {
+                nome: document.getElementById('nome').value,
+                email: document.getElementById('email').value,
+                senha: document.getElementById('senha').value,
+                tipo: document.getElementById('tipo').value
+            };
+            if (idEmEdicao === null) {
+                enviar('/api/usuarios', 'POST', dados, 'Usuário criado!');
+            } else {
+                const u = listaUsuarios.find(item => item.id === idEmEdicao);
+                dados.ativo = u ? u.ativo : true;
+                enviar('/api/usuarios/' + idEmEdicao, 'PUT', dados, 'Usuário atualizado!');
+            }
+        }
+
+        function bloquear(id) {
+            const u = listaUsuarios.find(item => item.id === id);
+            if (!u) return;
+            const acao = u.ativo ? 'BLOQUEAR' : 'DESBLOQUEAR';
+            if (!confirm(`${acao} o usuário ${u.nome}?`)) return;
+            enviar('/api/usuarios/' + id, 'PUT',
+                   {nome: u.nome, email: u.email, tipo: u.tipo, senha: '', ativo: !u.ativo},
+                   u.ativo ? 'Usuário bloqueado.' : 'Usuário desbloqueado.');
+        }
+
+        function excluir(id) {
+            const u = listaUsuarios.find(item => item.id === id);
+            if (!u) return;
+            if (!confirm(`Excluir o usuário ${u.nome}? Isso não pode ser desfeito.`)) return;
+            enviar('/api/usuarios/' + id, 'DELETE', null, 'Usuário excluído.');
+        }
+
+        ['nome', 'email', 'senha'].forEach(campo => {
+            document.getElementById(campo).addEventListener('keydown', evento => {
+                if (evento.key === 'Enter') salvarUsuario();
+            });
+        });
+
+        carregarUsuarios();
+    </script>
+</body>
+</html>

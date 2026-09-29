@@ -8,3 +8,6 @@ __pycache__/
 # Ambiente virtual
 venv/
 .venv/
+
+# Chave secreta do login (cada computador tem a sua)
+chave_secreta.txt

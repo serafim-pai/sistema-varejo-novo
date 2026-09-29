@@ -617,7 +617,9 @@ def vendas():
                 produto_id=produto_id,
                 quantidade=quantidade,
                 valor_total=quantidade * produto.preco,
-                custo_total=custo_da_venda(produto, quantidade)
+                custo_total=custo_da_venda(produto, quantidade),
+                vendedor_id=usuario_logado()['id'],
+                vendedor=usuario_logado()['nome']
             )
             session.add(nova_venda)
             session.commit()
@@ -642,7 +644,8 @@ def vendas():
             'cliente': v.cliente or '',
             'endereco_entrega': v.endereco_entrega or '',
             'forma_pagamento': v.forma_pagamento or '',
-            'desconto': v.desconto or 0
+            'desconto': v.desconto or 0,
+            'vendedor': v.vendedor or ''
         })
     session.close()
     return jsonify(resultado)
@@ -791,7 +794,8 @@ def finalizar_pedido():
                       custo_total=custo_da_venda(produto, quantidade),
                       cliente_id=cliente_id, cliente=cliente_nome,
                       telefone=cliente_telefone, endereco_entrega=cliente_endereco,
-                      forma_pagamento=forma_pagamento)
+                      forma_pagamento=forma_pagamento,
+                      vendedor_id=usuario_logado()['id'], vendedor=usuario_logado()['nome'])
         session.add(venda)
         session.flush()
         ids.append(venda.id)
@@ -820,6 +824,7 @@ def finalizar_pedido():
         'telefone': cliente_telefone or '',
         'endereco': cliente_endereco or '',
         'forma_pagamento': forma_pagamento,
+        'vendedor': usuario_logado()['nome'],
         'valor_recebido': valor_recebido,
         'troco': (valor_recebido - total) if valor_recebido is not None else None
     })
@@ -859,6 +864,7 @@ def orcamento_para_json(session, orcamento):
         'faltam': faltam,
         'situacao': situacao,
         'venda_numero': orcamento.venda_numero,
+        'vendedor': orcamento.vendedor or '',
         'itens': lista,
         'total': sum(i['subtotal'] for i in lista)
     }
@@ -898,7 +904,8 @@ def orcamentos():
             return jsonify({'sucesso': False, 'mensagem': 'O carrinho está vazio.'})
 
         orcamento = Orcamento(cliente=cliente, telefone=telefone, endereco=endereco,
-                              data=datetime.now(), validade_dias=validade_dias)
+                              data=datetime.now(), validade_dias=validade_dias,
+                              vendedor_id=usuario_logado()['id'], vendedor=usuario_logado()['nome'])
         session.add(orcamento)
         session.flush()
 
@@ -1018,6 +1025,19 @@ def mais_vendidos():
         forma = v.forma_pagamento or 'NÃO INFORMADO'
         por_pagamento[forma] = por_pagamento.get(forma, 0.0) + v.valor_total
 
+    # Quanto cada vendedor vendeu (vendas com vários itens contam como 1 venda)
+    por_vendedor = {}
+    for v in todas_vendas:
+        nome = v.vendedor or 'NÃO INFORMADO'
+        item = por_vendedor.setdefault(nome, {'vendedor': nome, 'valor': 0.0, 'vendas': set(), 'desconto': 0.0})
+        item['valor'] += v.valor_total
+        item['desconto'] += v.desconto or 0
+        item['vendas'].add(v.data)
+    lista_vendedores = sorted(
+        [{'vendedor': i['vendedor'], 'valor': i['valor'], 'desconto': i['desconto'],
+          'numero_vendas': len(i['vendas'])} for i in por_vendedor.values()],
+        key=lambda x: -x['valor'])
+
     custo_total = sum(i['custo'] for i in ranking)
     lucro_total = sum(i['lucro'] for i in ranking if i['lucro'] is not None)
 
@@ -1029,6 +1049,7 @@ def mais_vendidos():
         'custo_total': custo_total,
         'lucro_total': lucro_total,
         'vendas_sem_custo': sum(i['sem_custo'] for i in ranking),
+        'por_vendedor': lista_vendedores,
         'por_pagamento': [{'forma': f, 'valor': v}
                           for f, v in sorted(por_pagamento.items(), key=lambda x: -x[1])]
     })

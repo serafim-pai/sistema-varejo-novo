@@ -25,35 +25,48 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 13. **Aviso de reposição**: no alto da tela, lista os produtos com estoque baixo 🟡 ou zerado 🔴.
 14. **Validações**: não aceita nome ou categoria vazios ou com menos de 2 letras, preço zero ou negativo, nem quantidade negativa.
 
+### 👥 Clientes
+15. **Cadastro de clientes**: nome (obrigatório), telefone, CPF/CNPJ (opcional) e endereço. Tudo em **letras maiúsculas**.
+16. **Telefone padronizado**: DDD entre parênteses + 9 números, ex.: **(11) 98888-7777** (os sinais entram sozinhos).
+17. **Tecla Enter** pula para o próximo campo; no Endereço, salva o cliente.
+18. **Busca** por nome, telefone ou CPF. O balcão cadastra e edita; só o administrador exclui.
+
 ### 🛒 Vendas
-15. **Carrinho de compras**: adicione vários produtos (ex.: 2 AREIA + 5 CIMENTO + 1 BRITA), veja o total e finalize tudo de uma vez.
-16. **Comprovante para imprimir**: após finalizar, mostra o comprovante com itens, preços e total, pronto para imprimir.
-17. **Busca por digitação**: digite parte do nome (ex.: "cim") e escolha o produto na lista.
-18. **Caixa de estoque**: ao escolher o produto, uma caixa ao lado mostra quanto ainda tem em estoque.
-19. **Baixa automática**: o estoque diminui sozinho a cada venda.
-20. **Proteção**: não deixa vender mais do que existe no estoque.
-21. **Histórico de vendas**: mostra o que foi vendido, a quantidade, o valor e a data.
-22. **Cancelar venda** (só o administrador): desfaz uma venda errada e devolve os produtos ao estoque.
-23. **Tecla Enter**: agiliza o cadastro e a venda sem precisar clicar nos botões.
+19. **Carrinho de compras**: adicione vários produtos (ex.: 2 AREIA + 5 CIMENTO + 1 BRITA), veja o total e finalize tudo de uma vez.
+20. **Comprovante para imprimir**: após finalizar, mostra o comprovante com itens, preços e total, pronto para imprimir.
+21. **Busca por digitação**: digite parte do nome (ex.: "cim") e escolha o produto na lista.
+22. **Caixa de estoque**: ao escolher o produto, uma caixa ao lado mostra quanto ainda tem em estoque.
+23. **Baixa automática**: o estoque diminui sozinho a cada venda.
+24. **Proteção**: não deixa vender mais do que existe no estoque.
+25. **Histórico de vendas**: mostra o que foi vendido, a quantidade, o valor e a data.
+26. **Cancelar venda** (só o administrador): desfaz uma venda errada e devolve os produtos ao estoque.
+27. **Tecla Enter**: agiliza o cadastro e a venda sem precisar clicar nos botões.
+
+28. **Cliente e entrega na venda**: escolha um cliente cadastrado e o telefone e o endereço de entrega são preenchidos sozinhos. O comprovante mostra **🚚 ENTREGAR EM**.
+29. **Forma de pagamento** (obrigatória): **DINHEIRO › PIX › CARTÃO** (no cartão, **DÉBITO** ou **CRÉDITO**). No dinheiro, calcula o **troco**.
+30. **Desconto** só no **dinheiro ou Pix**, em % ou R$. Balcão: até **5%**; administrador: sem limite.
+31. **Quem vendeu**: cada venda e orçamento guarda o usuário; o comprovante mostra **"Atendido por"**.
 
 ### 📄 Orçamentos
-24. **Gerar orçamento**: monte o carrinho, digite o nome do cliente, escolha a **data de validade** (campo obrigatório) e gere o orçamento para imprimir. O estoque **não muda**.
-25. **Tela de Orçamentos**: lista todos os orçamentos, com busca por cliente, telefone ou número.
-26. **Idade do orçamento**: mostra "hoje", "ontem" ou "há 5 dias", e a situação em cores: 🟢 Aberto, 🟠 Vencendo (5 dias ou mais, ou faltando 2 dias para vencer), ⚫ Vencido (passou da validade), 🔵 Virou venda, 🔴 Cancelado.
-27. **Transformar em venda**: coloca os itens do orçamento no carrinho, mantendo os preços combinados.
+32. **Gerar orçamento**: monte o carrinho, digite o nome do cliente, escolha a **data de validade** (campo obrigatório) e gere o orçamento para imprimir. O estoque **não muda**.
+33. **Tela de Orçamentos**: lista todos os orçamentos, com busca por cliente, telefone ou número.
+34. **Idade do orçamento**: mostra "hoje", "ontem" ou "há 5 dias", e a situação em cores: 🟢 Aberto, 🟠 Vencendo (5 dias ou mais, ou faltando 2 dias para vencer), ⚫ Vencido (passou da validade), 🔵 Virou venda, 🔴 Cancelado.
+35. **Transformar em venda**: coloca os itens do orçamento no carrinho, mantendo os preços combinados.
 
 ### 📊 Relatórios (só o administrador)
-28. **Resumo do estoque**: total de produtos e valor total em estoque.
-29. **Produtos mais vendidos**: ranking com unidades, número de vendas, valor vendido, **custo, lucro e % de lucro**.
-30. **Lucro das vendas**: valor vendido, custo (preço de compra) e **LUCRO** total, em verde (ou vermelho se der prejuízo).
-31. **Lucro esperado do estoque**: quanto a loja pagou pelo estoque e quanto vai lucrar se vender tudo. Avisa quais produtos ainda estão sem preço de compra.
+36. **Resumo do estoque**: total de produtos e valor total em estoque.
+37. **Produtos mais vendidos**: ranking com unidades, número de vendas, valor vendido, **custo, lucro e % de lucro**.
+38. **Lucro das vendas**: valor vendido, custo (preço de compra) e **LUCRO** total, em verde (ou vermelho se der prejuízo).
+39. **Lucro esperado do estoque**: quanto a loja pagou pelo estoque e quanto vai lucrar se vender tudo. Avisa quais produtos ainda estão sem preço de compra.
+
+40. **Vendas por forma de pagamento** e **vendas por vendedor** (número de vendas, valor vendido e descontos dados).
 
 ### 🎨 Visual
-32. **Cores no estoque**:
+41. **Cores no estoque**:
     - 🟢 **Verde**: estoque bom (10 ou mais)
     - 🟡 **Amarelo**: estoque baixo (1 a 9)
     - 🔴 **Vermelho com bolinha**: sem estoque (0)
-33. **Menu laranja em destaque**, mostrando a tela atual.
+42. **Menu laranja em destaque**, mostrando a tela atual.
 
 ## 🛠️ Tecnologias usadas
 
@@ -66,13 +79,14 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 ```
 sistema-varejo-novo/
 ├── app.py              → programa principal (rotas e telas)
-├── database.py         → banco de dados (produtos, vendas, orçamentos e usuários)
+├── database.py         → banco de dados (produtos, vendas, orçamentos, clientes e usuários)
 ├── requirements.txt    → bibliotecas necessárias
 ├── chave_secreta.txt   → chave do login (criada sozinha; NÃO vai para o GitHub)
 └── templates/
     ├── _menu.html      → menu de cima (igual em todas as telas)
     ├── login.html      → tela de login e de primeiro acesso
     ├── usuarios.html   → tela de usuários (só administrador)
+    ├── clientes.html   → tela de clientes
     ├── index.html      → tela de cadastro de produtos
     ├── vendas.html     → tela de vendas e histórico
     ├── orcamentos.html → tela de orçamentos
@@ -106,8 +120,13 @@ sistema-varejo-novo/
 - [x] Unidade de medida nos produtos, no carrinho e no comprovante
 - [x] Orçamentos com validade, busca e transformar em venda
 - [x] Login com e-mail e senha, administrador master e usuário de balcão
-- [x] Preço de compra escondido e porcentagem de lucro
+- [x] Preço de compra e porcentagem de lucro
 - [x] Lucro (compra × venda) nos relatórios
+- [x] Cadastro de clientes e endereço de entrega
+- [x] Forma de pagamento com troco, sem fiado
+- [x] Desconto no dinheiro ou Pix (balcão até 5%)
+- [x] Telefone com DDD e letras maiúsculas
+- [x] Vendedor em cada venda e orçamento, e relatório por vendedor
 - [ ] Colocar o sistema online (PythonAnywhere)
 - [ ] Novas melhorias sugeridas pelo usuário
 

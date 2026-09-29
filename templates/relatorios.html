@@ -45,6 +45,9 @@
     </div>
     <div class="aviso-custo" id="avisoVendasSemCusto" style="display:none"></div>
 
+    <h2>👤 Vendas por Vendedor</h2>
+    <table id="tabelaVendedores"></table>
+
     <h2>💳 Vendas por Forma de Pagamento</h2>
     <div class="cards" id="cardsPagamento"></div>
 
@@ -166,6 +169,14 @@
                     document.getElementById('valorVendido').textContent = dinheiro(dados.valor_vendido);
                     document.getElementById('custoVendas').textContent = dinheiro(dados.custo_total);
                     document.getElementById('lucroVendas').innerHTML = textoLucro(dados.lucro_total);
+
+                    let htmlVend = '<tr><th>Vendedor</th><th>Nº de vendas</th><th>Valor vendido</th><th>Descontos dados</th></tr>';
+                    dados.por_vendedor.forEach(v => {
+                        htmlVend += `<tr><td><strong>${v.vendedor}</strong></td><td>${v.numero_vendas}</td>
+                            <td>${dinheiro(v.valor)}</td><td>${v.desconto > 0 ? dinheiro(v.desconto) : '-'}</td></tr>`;
+                    });
+                    document.getElementById('tabelaVendedores').innerHTML = dados.por_vendedor.length
+                        ? htmlVend : '<tr><td>Nenhuma venda registrada ainda.</td></tr>';
 
                     document.getElementById('cardsPagamento').innerHTML = dados.por_pagamento.length
                         ? dados.por_pagamento.map(p => `<div class="card">${p.forma}<span class="numero">${dinheiro(p.valor)}</span></div>`).join('')

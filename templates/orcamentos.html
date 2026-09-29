@@ -155,7 +155,7 @@
                 return;
             }
 
-            let html = '<tr><th>Nº</th><th>Feito em</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Situação</th><th>Ações</th></tr>';
+            let html = '<tr><th>Nº</th><th>Feito em</th><th>Vendedor</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Situação</th><th>Ações</th></tr>';
             filtrados.forEach(o => {
                 const resumo = o.itens.map(i => `${i.quantidade} ${i.unidade} ${i.produto}`).join('<br>');
                 const podeVender = o.situacao === 'ABERTO' || o.situacao === 'VENCENDO';
@@ -164,6 +164,7 @@
                 html += `<tr class="linha-${o.situacao}">
                     <td><strong>${o.id}</strong></td>
                     <td>${o.data}<br><span class="idade">${textoIdade(o.dias)}</span></td>
+                    <td>${o.vendedor || '-'}</td>
                     <td><strong>${o.cliente}</strong>${o.telefone ? '<br>📞 ' + o.telefone : ''}${o.endereco ? '<br>🚚 ' + o.endereco : ''}</td>
                     <td class="resumo">${resumo}</td>
                     <td><strong>${dinheiro(o.total)}</strong></td>
@@ -197,6 +198,7 @@
                 ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
                 ${o.endereco ? `<div>Entrega: ${o.endereco}</div>` : ''}
                 <div>Data: ${o.data}</div>
+                ${o.vendedor ? `<div>Atendido por: ${o.vendedor}</div>` : ''}
                 <div><strong>Válido até: ${o.valido_ate}</strong></div>
                 <hr>
                 <table>${linhas}</table>

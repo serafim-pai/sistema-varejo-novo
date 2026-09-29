@@ -73,6 +73,8 @@ class Venda(Base):
     endereco_entrega = Column(String(200), nullable=True)
     forma_pagamento = Column(String(30), nullable=True)   # DINHEIRO, PIX, CARTÃO DE DÉBITO, CARTÃO DE CRÉDITO
     desconto = Column(Float, nullable=True)                # desconto em R$ dado neste item (valor_total já vem descontado)
+    vendedor_id = Column(Integer, nullable=True)           # usuário que fez a venda
+    vendedor = Column(String(100), nullable=True)          # nome do usuário (fica guardado mesmo se ele for excluído)
 
 
 class Orcamento(Base):
@@ -87,6 +89,8 @@ class Orcamento(Base):
     validade_dias = Column(Integer, nullable=False, default=7)
     situacao = Column(String(20), nullable=False, default='ABERTO')   # ABERTO, VIROU VENDA, CANCELADO
     venda_numero = Column(Integer, nullable=True)                      # nº da venda, quando virar venda
+    vendedor_id = Column(Integer, nullable=True)                       # usuário que fez o orçamento
+    vendedor = Column(String(100), nullable=True)
 
 
 class OrcamentoItem(Base):
@@ -133,6 +137,10 @@ novas_colunas = [
     ('vendas', 'endereco_entrega', 'VARCHAR(200)'),
     ('vendas', 'forma_pagamento', 'VARCHAR(30)'),
     ('vendas', 'desconto', 'FLOAT'),
+    ('vendas', 'vendedor_id', 'INTEGER'),
+    ('vendas', 'vendedor', 'VARCHAR(100)'),
+    ('orcamentos', 'vendedor_id', 'INTEGER'),
+    ('orcamentos', 'vendedor', 'VARCHAR(100)'),
     ('orcamentos', 'endereco', 'VARCHAR(200)'),
 ]
 for tabela, coluna, tipo in novas_colunas:

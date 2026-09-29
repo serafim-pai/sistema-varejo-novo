@@ -496,6 +496,7 @@
                 <hr>
                 <div>Venda nº: ${res.numero}</div>
                 <div>Data: ${res.data}</div>
+                ${res.vendedor ? `<div>Atendido por: ${res.vendedor}</div>` : ''}
                 ${res.cliente ? `<div>Cliente: ${res.cliente}</div>` : ''}
                 ${res.telefone ? `<div>Telefone: ${res.telefone}</div>` : ''}
                 ${res.endereco ? `<hr><div><strong>🚚 ENTREGAR EM:</strong><br>${res.endereco}</div>` : ''}
@@ -579,6 +580,7 @@
                 ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
                 ${o.endereco ? `<div>Entrega: ${o.endereco}</div>` : ''}
                 <div>Data: ${o.data}</div>
+                ${o.vendedor ? `<div>Atendido por: ${o.vendedor}</div>` : ''}
                 <div><strong>Válido até: ${o.valido_ate}</strong></div>
                 <hr>
                 <table>${linhas}</table>
@@ -659,7 +661,7 @@
             fetch('/api/vendas')
                 .then(r => r.json())
                 .then(vendas => {
-                    let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Pagamento</th><th>Cliente</th><th>Data</th><th>Ação</th></tr>';
+                    let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Pagamento</th><th>Vendedor</th><th>Cliente</th><th>Data</th><th>Ação</th></tr>';
                     vendas.forEach(v => {
                         html += `<tr>
                             <td>${v.id}</td>
@@ -667,6 +669,7 @@
                             <td>${v.quantidade} ${v.unidade}</td>
                             <td>${dinheiro(v.valor_total)}</td>
                             <td>${v.forma_pagamento || '-'}</td>
+                            <td>${v.vendedor || '-'}</td>
                             <td>${v.cliente || '-'}${v.endereco_entrega ? '<br><small>🚚 ' + v.endereco_entrega + '</small>' : ''}</td>
                             <td>${v.data}</td>
                             <td>${EH_ADMIN ? `<button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button>` : '-'}</td>

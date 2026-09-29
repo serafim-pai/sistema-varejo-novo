@@ -1,25 +1,38 @@
 {# Menu de cima, igual em todas as telas. Cada tela diz qual é a "pagina" ativa. #}
 <style>
-    nav { display: flex; align-items: center; flex-wrap: wrap; }
-    nav .quem { margin-left: auto; color: #fff; font-size: 15px; font-weight: bold;
+    /* Menu compacto: cabe numa linha só em telas normais */
+    nav { display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+          padding: 8px 10px !important; }
+    nav a { font-size: 16px !important; padding: 6px 12px !important; margin-right: 0 !important;
+            white-space: nowrap; }
+    nav .quem { margin-left: auto; display: flex; align-items: center; gap: 6px; color: #fff;
+                font-size: 14px; font-weight: bold; white-space: nowrap;
                 text-shadow: 1px 1px 2px rgba(0,0,0,0.45); }
-    nav .quem a { font-size: 15px; padding: 6px 12px; margin: 0 0 0 8px; background: #b33c00; }
-    nav .quem .etiqueta { background: #fff; color: #e65100; padding: 2px 8px; border-radius: 10px;
-                          font-size: 12px; margin-left: 4px; text-shadow: none; }
+    nav .quem a { font-size: 14px !important; padding: 5px 10px !important; background: #b33c00; }
+    nav .quem .etiqueta { background: #fff; color: #e65100; padding: 2px 7px; border-radius: 10px;
+                          font-size: 11px; text-shadow: none; }
+
+    /* Telas pequenas (celular): menu em "botões" que se ajustam, nome embaixo */
+    @media (max-width: 700px) {
+        body { margin: 8px !important; }
+        nav a { font-size: 14px !important; padding: 6px 8px !important; }
+        nav .quem { margin-left: 0; width: 100%; justify-content: space-between;
+                    border-top: 1px solid rgba(255,255,255,0.4); padding-top: 6px; margin-top: 2px; }
+        table { display: block; overflow-x: auto; }   /* tabelas grandes rolam para o lado */
+    }
 </style>
 <nav>
-    <a href="/" {% if pagina == 'produtos' %}class="ativo"{% endif %}>Produtos</a>
-    <a href="/vendas" {% if pagina == 'vendas' %}class="ativo"{% endif %}>Vendas</a>
-    <a href="/orcamentos" {% if pagina == 'orcamentos' %}class="ativo"{% endif %}>Orçamentos</a>
-    <a href="/clientes" {% if pagina == 'clientes' %}class="ativo"{% endif %}>Clientes</a>
+    <a href="/" {% if pagina == 'produtos' %}class="ativo"{% endif %}>📦 Produtos</a>
+    <a href="/vendas" {% if pagina == 'vendas' %}class="ativo"{% endif %}>🛒 Vendas</a>
+    <a href="/orcamentos" {% if pagina == 'orcamentos' %}class="ativo"{% endif %}>📄 Orçamentos</a>
+    <a href="/clientes" {% if pagina == 'clientes' %}class="ativo"{% endif %}>👥 Clientes</a>
     {% if admin %}
-    <a href="/relatorios" {% if pagina == 'relatorios' %}class="ativo"{% endif %}>Relatórios</a>
-    <a href="/usuarios" {% if pagina == 'usuarios' %}class="ativo"{% endif %}>Usuários</a>
+    <a href="/relatorios" {% if pagina == 'relatorios' %}class="ativo"{% endif %}>📊 Relatórios</a>
+    <a href="/usuarios" {% if pagina == 'usuarios' %}class="ativo"{% endif %}>🔐 Usuários</a>
     {% endif %}
     {% if usuario %}
     <span class="quem">
-        👤 {{ usuario.nome }}
-        <span class="etiqueta">{{ 'ADMINISTRADOR' if admin else 'BALCÃO' }}</span>
+        <span>👤 {{ usuario.nome }} <span class="etiqueta">{{ 'ADMIN' if admin else 'BALCÃO' }}</span></span>
         <a href="/sair">Sair</a>
     </span>
     {% endif %}

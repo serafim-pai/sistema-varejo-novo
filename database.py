@@ -45,6 +45,7 @@ class Venda(Base):
     produto_id = Column(Integer, nullable=False)
     quantidade = Column(Integer, nullable=False)
     valor_total = Column(Float, nullable=False)
+    custo_total = Column(Float, nullable=True)   # quanto a loja pagou por esses itens (preço de compra do dia)
     data = Column(DateTime, default=datetime.now)
 
 
@@ -90,3 +91,9 @@ if 'preco_compra' not in colunas:
 if 'margem' not in colunas:
     with engine.begin() as conexao:
         conexao.execute(text("ALTER TABLE produtos ADD COLUMN margem FLOAT"))
+
+# Vendas: guarda o custo (preço de compra) no momento da venda, para calcular o lucro
+colunas_vendas = [c['name'] for c in inspect(engine).get_columns('vendas')]
+if 'custo_total' not in colunas_vendas:
+    with engine.begin() as conexao:
+        conexao.execute(text("ALTER TABLE vendas ADD COLUMN custo_total FLOAT"))

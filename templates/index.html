@@ -30,7 +30,6 @@
         .grupo-precos input { width: 110px; }
         .grupo-precos #margem { width: 70px; }
         .sinal { font-weight: bold; color: #8a3200; padding-bottom: 14px; }
-        .btn-olho { cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
         .custo { color: #8a3200; font-weight: bold; }
         .somente-ver { background: #e8f0fe; border: 2px solid #90b4f5; color: #1a3d7c; }
         .btn-entrada { background: #28a745; color: #fff; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
@@ -50,15 +49,13 @@
         <h2 id="tituloFormulario">Novo Produto</h2>
         <input type="text" id="nome" placeholder="Nome">
 
-        <!-- Preços: COMPRA (escondido com *) -> % -> VENDA.
+        <!-- Preços: COMPRA -> % -> VENDA.
              Digitou compra e %: o preço de venda é calculado sozinho.
              Mudou o preço de venda: a % é recalculada. -->
         <span class="grupo-precos">
             <span>
-                <label for="precoCompra">Preço de compra *</label>
-                <input type="password" id="precoCompra" placeholder="******" inputmode="decimal"
-                       autocomplete="off" title="Preço de compra (fica escondido)">
-                <button type="button" class="btn-olho" id="btnOlho" onclick="mostrarCompra()" title="Mostrar / esconder">👁</button>
+                <label for="precoCompra">Preço de compra</label>
+                <input type="number" id="precoCompra" placeholder="Compra" step="0.01" autocomplete="off">
             </span>
             <span class="sinal">→</span>
             <span>
@@ -86,9 +83,6 @@
     {% endif %}
 
     <h2>Produtos em Estoque</h2>
-    {% if admin %}
-    <p><button type="button" id="btnCustos" onclick="alternarCustos()">👁 Mostrar preço de compra e %</button></p>
-    {% endif %}
     <p class="legenda">
         <span class="estoque-ok">Verde: estoque bom (10 ou mais)</span>
         <span class="estoque-baixo">Amarelo: estoque baixo (1 a 9)</span>
@@ -116,7 +110,6 @@
         // Guarda o ID do produto que está sendo editado (null = cadastrando um novo)
         let idEmEdicao = null;
         let listaProdutos = [];
-        let mostrandoCustos = false;   // na tabela, o preço de compra começa escondido
 
         // Lê um número de uma caixa (aceita vírgula). Caixa vazia = null
         function lerNumero(id) {
@@ -144,29 +137,12 @@
             }
         }
 
-        // Botão 👁 do formulário: mostra ou esconde o preço de compra digitado
-        function mostrarCompra() {
-            const caixa = document.getElementById('precoCompra');
-            caixa.type = caixa.type === 'password' ? 'text' : 'password';
-        }
-
-        // Botão da tabela: mostra ou esconde a coluna de compra e %
-        function alternarCustos() {
-            mostrandoCustos = !mostrandoCustos;
-            document.getElementById('btnCustos').textContent = mostrandoCustos
-                ? '🙈 Esconder preço de compra e %'
-                : '👁 Mostrar preço de compra e %';
-            carregarProdutos();
-        }
-
         function textoCusto(p) {
-            if (!mostrandoCustos) return '******';
             if (p.preco_compra === null || p.preco_compra === undefined) return '-';
             return 'R$ ' + p.preco_compra.toFixed(2);
         }
 
         function textoMargem(p) {
-            if (!mostrandoCustos) return '***';
             if (p.margem === null || p.margem === undefined) return '-';
             return p.margem.toFixed(2) + '%';
         }
@@ -177,7 +153,7 @@
                 .then(produtos => {
                     listaProdutos = produtos;
                     let html = '<tr><th>ID</th><th>Nome</th>'
-                        + (EH_ADMIN ? '<th>Compra *</th><th>%</th>' : '')
+                        + (EH_ADMIN ? '<th>Compra</th><th>%</th>' : '')
                         + '<th>Preço</th><th>Quantidade</th><th>Unidade</th><th>Categoria</th>'
                         + (EH_ADMIN ? '<th>Ações</th>' : '') + '</tr>';
                     produtos.forEach(p => {
@@ -204,7 +180,6 @@
         function limparFormulario() {
             document.getElementById('nome').value = '';
             document.getElementById('precoCompra').value = '';
-            document.getElementById('precoCompra').type = 'password';
             document.getElementById('margem').value = '';
             document.getElementById('preco').value = '';
             document.getElementById('quantidade').value = '';

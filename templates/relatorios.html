@@ -19,6 +19,15 @@
                 padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
         nav a:hover { background: #ff8a3d; }
         nav a.ativo { background: #ffffff; color: #e65100; }
+        .cards { display: flex; flex-wrap: wrap; gap: 12px; }
+        .cards .card { flex: 1; min-width: 200px; margin: 0; }
+        .card .numero { font-size: 24px; font-weight: bold; display: block; margin-top: 4px; }
+        .lucro { background: #d4edda; color: #155724; }
+        .custo { background: #fff3e0; color: #8a3200; }
+        .positivo { color: #155724; font-weight: bold; }
+        .negativo { color: #b00020; font-weight: bold; }
+        .aviso-custo { background: #fff3cd; border: 2px solid #ffc107; color: #5c4400;
+                       border-radius: 6px; padding: 10px 14px; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -27,19 +36,27 @@
 
     <h1>Relatórios</h1>
 
-    <h2>Resumo do Estoque</h2>
-    <div class="card">
-        <p>Total de Produtos: <strong id="totalProdutos">0</strong></p>
-        <p>Valor Total em Estoque: <strong id="valorTotal">R$ 0.00</strong></p>
+    <h2>💰 Lucro das Vendas</h2>
+    <div class="cards">
+        <div class="card">Total de vendas<span class="numero" id="totalVendas">0</span></div>
+        <div class="card">Valor vendido<span class="numero" id="valorVendido">R$ 0.00</span></div>
+        <div class="card custo">Custo (preço de compra)<span class="numero" id="custoVendas">R$ 0.00</span></div>
+        <div class="card lucro">LUCRO<span class="numero" id="lucroVendas">R$ 0.00</span></div>
     </div>
+    <div class="aviso-custo" id="avisoVendasSemCusto" style="display:none"></div>
 
     <h2>🏆 Produtos Mais Vendidos</h2>
     <div class="destaque" id="campeao">Nenhuma venda registrada ainda.</div>
-    <div class="card">
-        <p>Total de Vendas: <strong id="totalVendas">0</strong></p>
-        <p>Valor Total Vendido: <strong id="valorVendido">R$ 0.00</strong></p>
-    </div>
     <table id="tabelaMaisVendidos"></table>
+
+    <h2>📦 Resumo do Estoque</h2>
+    <div class="cards">
+        <div class="card">Total de produtos<span class="numero" id="totalProdutos">0</span></div>
+        <div class="card">Valor do estoque (preço de venda)<span class="numero" id="valorTotal">R$ 0.00</span></div>
+        <div class="card custo">Custo do estoque (preço de compra)<span class="numero" id="custoEstoque">R$ 0.00</span></div>
+        <div class="card lucro">Lucro esperado se vender tudo<span class="numero" id="lucroEstoque">R$ 0.00</span></div>
+    </div>
+    <div class="aviso-custo" id="avisoSemCusto" style="display:none"></div>
 
     <h2>Produtos em Estoque</h2>
     <p class="legenda">
@@ -63,28 +80,78 @@
             return 'estoque-ok';
         }
 
+        function dinheiro(valor) {
+            return 'R$ ' + valor.toFixed(2);
+        }
+
+        // Lucro em verde (positivo) ou vermelho (prejuízo)
+        function textoLucro(valor) {
+            if (valor === null || valor === undefined) return '-';
+            const classe = valor >= 0 ? 'positivo' : 'negativo';
+            return `<span class="${classe}">${dinheiro(valor)}</span>`;
+        }
+
+        function textoPorcento(valor) {
+            if (valor === null || valor === undefined) return '-';
+            const classe = valor >= 0 ? 'positivo' : 'negativo';
+            return `<span class="${classe}">${valor.toFixed(1)}%</span>`;
+        }
+
         function carregarEstoque() {
             fetch('/api/produtos')
                 .then(r => r.json())
                 .then(produtos => {
                     let valorTotal = 0;
-                    let html = '<tr><th>Nome</th><th>Quantidade</th><th>Unidade</th><th>Preço</th><th>Total</th></tr>';
+                    let custoTotal = 0;
+                    let lucroTotal = 0;
+                    const semCusto = [];
+                    let html = '<tr><th>Nome</th><th>Quantidade</th><th>Unidade</th><th>Compra</th><th>Preço</th>'
+                             + '<th>Lucro por unidade</th><th>Total (venda)</th><th>Lucro esperado</th></tr>';
 
                     produtos.forEach(p => {
                         const totalProduto = p.quantidade * p.preco;
                         valorTotal += totalProduto;
+
+                        const temCusto = p.preco_compra !== null && p.preco_compra !== undefined;
+                        let lucroUnidade = null;
+                        let lucroProduto = null;
+                        if (temCusto) {
+                            lucroUnidade = p.preco - p.preco_compra;
+                            lucroProduto = lucroUnidade * Math.max(p.quantidade, 0);
+                            custoTotal += p.preco_compra * Math.max(p.quantidade, 0);
+                            lucroTotal += lucroProduto;
+                        } else {
+                            semCusto.push(p.nome);
+                        }
+
                         html += `<tr>
                             <td>${p.nome}</td>
                             <td class="${corEstoque(p.quantidade)}">${textoQuantidade(p.quantidade)}</td>
                             <td>${p.unidade}</td>
-                            <td>R$ ${p.preco.toFixed(2)}</td>
-                            <td>R$ ${totalProduto.toFixed(2)}</td>
+                            <td>${temCusto ? dinheiro(p.preco_compra) : '-'}</td>
+                            <td>${dinheiro(p.preco)}</td>
+                            <td>${textoLucro(lucroUnidade)}</td>
+                            <td>${dinheiro(totalProduto)}</td>
+                            <td>${textoLucro(lucroProduto)}</td>
                         </tr>`;
                     });
 
                     document.getElementById('totalProdutos').textContent = produtos.length;
-                    document.getElementById('valorTotal').textContent = 'R$ ' + valorTotal.toFixed(2);
+                    document.getElementById('valorTotal').textContent = dinheiro(valorTotal);
+                    document.getElementById('custoEstoque').textContent = dinheiro(custoTotal);
+                    document.getElementById('lucroEstoque').innerHTML = textoLucro(lucroTotal);
                     document.getElementById('tabelaProdutos').innerHTML = html;
+
+                    // Aviso: produtos sem preço de compra ficam fora da conta do lucro
+                    const aviso = document.getElementById('avisoSemCusto');
+                    if (semCusto.length > 0) {
+                        aviso.style.display = 'block';
+                        aviso.innerHTML = `⚠️ <strong>${semCusto.length} produto(s) sem preço de compra</strong> `
+                            + `ficaram fora da conta do custo e do lucro: ${semCusto.join(', ')}. `
+                            + `Cadastre o preço de compra em <a href="/">Produtos</a> (botão Editar).`;
+                    } else {
+                        aviso.style.display = 'none';
+                    }
                 });
         }
 
@@ -93,7 +160,18 @@
                 .then(r => r.json())
                 .then(dados => {
                     document.getElementById('totalVendas').textContent = dados.total_vendas;
-                    document.getElementById('valorVendido').textContent = 'R$ ' + dados.valor_vendido.toFixed(2);
+                    document.getElementById('valorVendido').textContent = dinheiro(dados.valor_vendido);
+                    document.getElementById('custoVendas').textContent = dinheiro(dados.custo_total);
+                    document.getElementById('lucroVendas').innerHTML = textoLucro(dados.lucro_total);
+
+                    const avisoVendas = document.getElementById('avisoVendasSemCusto');
+                    if (dados.vendas_sem_custo > 0) {
+                        avisoVendas.style.display = 'block';
+                        avisoVendas.innerHTML = `⚠️ <strong>${dados.vendas_sem_custo} venda(s)</strong> são de produtos `
+                            + `sem preço de compra, por isso ficaram fora da conta do lucro.`;
+                    } else {
+                        avisoVendas.style.display = 'none';
+                    }
 
                     const ranking = dados.ranking;
                     if (ranking.length === 0) {
@@ -106,14 +184,19 @@
                     document.getElementById('campeao').innerHTML =
                         `🥇 O produto que mais vende é <strong>${primeiro.produto}</strong>, com <strong>${primeiro.quantidade_vendida} ${primeiro.unidade}</strong> vendidos.`;
 
-                    let html = '<tr><th>Posição</th><th>Produto</th><th>Quantidade Vendida</th><th>Nº de Vendas</th><th>Valor Vendido</th></tr>';
+                    let html = '<tr><th>Posição</th><th>Produto</th><th>Quantidade Vendida</th><th>Nº de Vendas</th>'
+                             + '<th>Valor Vendido</th><th>Custo</th><th>Lucro</th><th>% Lucro</th></tr>';
                     ranking.forEach((item, i) => {
+                        const temLucro = item.lucro !== null;
                         html += `<tr>
                             <td>${i + 1}º</td>
                             <td>${item.produto}</td>
                             <td>${item.quantidade_vendida} ${item.unidade}</td>
                             <td>${item.numero_vendas}</td>
-                            <td>R$ ${item.valor_vendido.toFixed(2)}</td>
+                            <td>${dinheiro(item.valor_vendido)}</td>
+                            <td>${temLucro ? dinheiro(item.custo) : '-'}</td>
+                            <td>${textoLucro(item.lucro)}</td>
+                            <td>${textoPorcento(item.margem)}</td>
                         </tr>`;
                     });
                     document.getElementById('tabelaMaisVendidos').innerHTML = html;

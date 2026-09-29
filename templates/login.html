@@ -16,12 +16,15 @@
         button { width: 100%; margin-top: 20px; padding: 12px; font-size: 18px; font-weight: bold;
                  background: #e65100; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
         button:hover { background: #ff8a3d; }
+        /* Senha com bolinhas, mas sem ser "campo de senha": assim o navegador
+           não oferece nem guarda e-mails e senhas neste computador */
+        .escondido { -webkit-text-security: disc; text-security: disc; }
         .erro { background: #f8d7da; color: #721c24; border: 2px solid #f5c2c7;
                 padding: 10px; border-radius: 5px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <form class="caixa" method="post" autocomplete="on">
+    <form class="caixa" method="post" autocomplete="off">
         {% if modo == 'primeiro' %}
             <h1>Bem-vindo!</h1>
             <p class="sub">Primeiro acesso: crie o <strong>ADMINISTRADOR MASTER</strong> do sistema.</p>
@@ -34,24 +37,33 @@
 
         {% if modo == 'primeiro' %}
             <label for="nome">Nome</label>
-            <input type="text" id="nome" name="nome" value="{{ nome }}" required autofocus>
+            <input type="text" id="nome" name="nome" value="{{ nome }}" required autofocus autocomplete="off">
         {% endif %}
 
-        <label for="email">E-mail</label>
-        <input type="email" id="email" name="email" value="{{ email }}" required
+        <label for="acesso">E-mail</label>
+        <input type="text" id="acesso" name="acesso" value="{{ email }}" required
+               autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true"
                {% if modo != 'primeiro' %}autofocus{% endif %}>
 
-        <label for="senha">Senha</label>
-        <input type="password" id="senha" name="senha" required
+        <label for="chave">Senha</label>
+        <input type="text" id="chave" name="chave" class="escondido" required
+               autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true"
                {% if modo == 'primeiro' %}minlength="6" placeholder="Pelo menos 6 caracteres"{% endif %}>
 
         {% if modo == 'primeiro' %}
             <label for="senha2">Repita a senha</label>
-            <input type="password" id="senha2" name="senha2" required minlength="6">
+            <input type="text" id="chave2" name="chave2" class="escondido" required minlength="6"
+                   autocomplete="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
             <button type="submit">Criar administrador e entrar</button>
         {% else %}
             <button type="submit">Entrar</button>
         {% endif %}
     </form>
+    <script>
+        // Navegador antigo que não sabe mostrar bolinhas? Então usa campo de senha normal.
+        if (!(window.CSS && CSS.supports('-webkit-text-security', 'disc'))) {
+            document.querySelectorAll('.escondido').forEach(c => c.type = 'password');
+        }
+    </script>
 </body>
 </html>

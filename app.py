@@ -107,8 +107,8 @@ def pagina_login():
     erro = None
     email = ''
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        senha = request.form.get('senha', '')
+        email = request.form.get('acesso', '').strip().lower()
+        senha = request.form.get('chave', '')
         session = Session()
         usuario = session.query(Usuario).filter_by(email=email).first()
         if not usuario or not check_password_hash(usuario.senha_hash, senha):
@@ -137,9 +137,9 @@ def primeiro_acesso():
     erro = None
     dados = {'nome': '', 'email': ''}
     if request.method == 'POST':
-        dados = {'nome': request.form.get('nome', ''), 'email': request.form.get('email', ''),
-                 'senha': request.form.get('senha', ''), 'tipo': 'ADMIN'}
-        if request.form.get('senha', '') != request.form.get('senha2', ''):
+        dados = {'nome': request.form.get('nome', ''), 'email': request.form.get('acesso', ''),
+                 'senha': request.form.get('chave', ''), 'tipo': 'ADMIN'}
+        if request.form.get('chave', '') != request.form.get('chave2', ''):
             erro = 'As duas senhas não são iguais.'
         else:
             erro, limpos = validar_usuario(session, dados)
@@ -475,6 +475,13 @@ def entrada_estoque(id):
 
 # ---------- API DE VENDAS ----------
 
+def custo_da_venda(produto, quantidade):
+    """Quanto a loja pagou pelos itens vendidos (usa o preço de compra de hoje).
+    Se o produto não tem preço de compra, devolve None (lucro desconhecido)."""
+    if produto.preco_compra is None:
+        return None
+    return quantidade * produto.preco_compra
+
 @app.route('/api/vendas', methods=['GET', 'POST'])
 def vendas():
     session = Session()
@@ -492,7 +499,8 @@ def vendas():
             nova_venda = Venda(
                 produto_id=produto_id,
                 quantidade=quantidade,
-                valor_total=quantidade * produto.preco
+                valor_total=quantidade * produto.preco,
+                custo_total=custo_da_venda(produto, quantidade)
             )
             session.add(nova_venda)
             session.commit()
@@ -606,7 +614,8 @@ def finalizar_pedido():
         subtotal = quantidade * preco
         produto.quantidade -= quantidade
         venda = Venda(produto_id=produto_id, quantidade=quantidade,
-                      valor_total=subtotal, data=agora)
+                      valor_total=subtotal, data=agora,
+                      custo_total=custo_da_venda(produto, quantidade))
         session.add(venda)
         session.flush()
         ids.append(venda.id)
@@ -768,28 +777,61 @@ def mais_vendidos():
 
     # Soma as vendas de cada produto
     resumo = {}
+    produtos = {}
     for v in todas_vendas:
         if v.produto_id not in resumo:
             produto = session.query(Produto).filter_by(id=v.produto_id).first()
+            produtos[v.produto_id] = produto
             resumo[v.produto_id] = {
                 'produto': produto.nome if produto else '(produto excluído)',
                 'unidade': (produto.unidade if produto else None) or 'UN',
                 'quantidade_vendida': 0,
                 'numero_vendas': 0,
-                'valor_vendido': 0.0
+                'valor_vendido': 0.0,
+                'custo': 0.0,
+                'valor_com_custo': 0.0,   # parte das vendas em que o custo é conhecido
+                'sem_custo': 0            # vendas sem preço de compra (lucro desconhecido)
             }
-        resumo[v.produto_id]['quantidade_vendida'] += v.quantidade
-        resumo[v.produto_id]['numero_vendas'] += 1
-        resumo[v.produto_id]['valor_vendido'] += v.valor_total
+        item = resumo[v.produto_id]
+        item['quantidade_vendida'] += v.quantidade
+        item['numero_vendas'] += 1
+        item['valor_vendido'] += v.valor_total
+
+        # Custo desta venda: o que foi guardado na hora da venda.
+        # Vendas antigas (de antes do preço de compra existir) usam o preço de compra atual.
+        custo = v.custo_total
+        produto = produtos[v.produto_id]
+        if custo is None and produto and produto.preco_compra is not None:
+            custo = v.quantidade * produto.preco_compra
+        if custo is None:
+            item['sem_custo'] += 1
+        else:
+            item['custo'] += custo
+            item['valor_com_custo'] += v.valor_total
+
+    # Lucro de cada produto (só da parte em que o custo é conhecido)
+    for item in resumo.values():
+        if item['sem_custo'] == item['numero_vendas']:
+            item['lucro'] = None
+            item['margem'] = None
+        else:
+            item['lucro'] = item['valor_com_custo'] - item['custo']
+            item['margem'] = (item['lucro'] / item['custo'] * 100) if item['custo'] > 0 else None
 
     # Ordena do que mais vendeu para o que menos vendeu
     ranking = sorted(resumo.values(), key=lambda item: item['quantidade_vendida'], reverse=True)
+
+    custo_total = sum(i['custo'] for i in ranking)
+    lucro_total = sum(i['lucro'] for i in ranking if i['lucro'] is not None)
 
     session.close()
     return jsonify({
         'ranking': ranking,
         'total_vendas': len(todas_vendas),
-        'valor_vendido': sum(v.valor_total for v in todas_vendas)
+        'valor_vendido': sum(v.valor_total for v in todas_vendas),
+        'custo_total': custo_total,
+        'lucro_total': lucro_total,
+        'vendas_sem_custo': sum(i['sem_custo'] for i in ranking)
     })
 
 

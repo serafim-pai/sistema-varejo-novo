@@ -63,6 +63,20 @@
                          font-size: 18px; padding: 12px 22px; cursor: pointer; }
         .cliente { background: #f3eefc; border: 1px solid #c9b6f0; border-radius: 6px; padding: 8px 10px; margin: 10px 0; }
         .cliente label { font-weight: bold; margin-right: 5px; }
+        .cliente .linha { margin-top: 4px; }
+        #endereco { width: 420px; }
+        .pagamento { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px; padding: 8px 10px; margin: 10px 0; }
+        .formas button { background: #fff; border: 2px solid #28a745; color: #155724; border-radius: 6px;
+                         font-weight: bold; font-size: 15px; padding: 10px 14px; cursor: pointer; }
+        .formas button.escolhida { background: #28a745; color: #fff; }
+        .formas .seta { font-weight: bold; color: #155724; margin: 0 2px; }
+        #opcoesCartao { display: none; background: #fff; border: 1px dashed #28a745; border-radius: 6px;
+                        padding: 4px 8px; margin-left: 4px; }
+        .maiusculo { text-transform: uppercase; }
+        #areaDinheiro { display: none; margin-top: 6px; }
+        #valorRecebido { width: 140px; font-size: 16px; }
+        #troco { font-size: 20px; font-weight: bold; margin-left: 10px; }
+        .validade { background: #fff; border: 1px dashed #c9b6f0; border-radius: 6px; padding: 4px 8px; margin-top: 6px; display: inline-block; }
         #bannerOrcamento { display: none; background: #f3eefc; border: 2px solid #6f42c1; color: #3d2270;
                            border-radius: 6px; padding: 12px 16px; margin: 10px 0; font-size: 16px; }
         .obrigatorio { color: #dc3545; font-weight: bold; }
@@ -91,12 +105,42 @@
         <div id="listaCarrinho"></div>
         <div class="total">TOTAL: <span id="totalCarrinho">R$ 0.00</span></div>
         <div class="cliente">
-            <div><strong>Dados do orçamento</strong> <small>(campos com <span class="obrigatorio">*</span> são obrigatórios)</small></div>
-            <label>Cliente <span class="obrigatorio">*</span></label>
-            <input type="text" id="cliente" placeholder="Nome do cliente">
-            <input type="text" id="telefone" placeholder="Telefone (opcional)">
-            <label>Válido até <span class="obrigatorio">*</span></label>
-            <input type="date" id="validade" title="Data de validade do orçamento (obrigatório)">
+            <div><strong>👤 Cliente</strong> <small>(opcional na venda; no orçamento, o nome é obrigatório)</small></div>
+            <div class="linha">
+                <label>Cliente</label>
+                <input type="text" id="cliente" list="listaClientes" placeholder="Nome do cliente" autocomplete="off">
+                <datalist id="listaClientes"></datalist>
+                <input type="text" id="telefone" placeholder="Telefone" autocomplete="off">
+            </div>
+            <div class="linha">
+                <label>🚚 Entrega</label>
+                <input type="text" id="endereco" placeholder="Endereço de entrega (deixe em branco se o cliente leva)" autocomplete="off">
+            </div>
+            <div class="validade">
+                <label>📄 Só para orçamento – Válido até <span class="obrigatorio">*</span></label>
+                <input type="date" id="validade" title="Data de validade do orçamento (obrigatório)">
+            </div>
+        </div>
+        <div class="pagamento">
+            <div><strong>💳 Forma de pagamento</strong> <span class="obrigatorio">*</span> <small>(obrigatório para finalizar a venda)</small></div>
+            <!-- DINHEIRO > PIX > CARTÃO (e, no cartão, DÉBITO ou CRÉDITO) -->
+            <div class="formas" id="formasPagamento">
+                <button type="button" data-forma="DINHEIRO" onclick="escolherPagamento('DINHEIRO')">💵 DINHEIRO</button>
+                <span class="seta">›</span>
+                <button type="button" data-forma="PIX" onclick="escolherPagamento('PIX')">📱 PIX</button>
+                <span class="seta">›</span>
+                <button type="button" data-forma="CARTAO" id="btnCartao" onclick="escolherCartao()">💳 CARTÃO</button>
+                <span id="opcoesCartao">
+                    <button type="button" data-forma="CARTÃO DE DÉBITO" onclick="escolherPagamento('CARTÃO DE DÉBITO')">DÉBITO</button>
+                    ou
+                    <button type="button" data-forma="CARTÃO DE CRÉDITO" onclick="escolherPagamento('CARTÃO DE CRÉDITO')">CRÉDITO</button>
+                </span>
+            </div>
+            <div id="areaDinheiro">
+                <label><strong>💵 Valor recebido:</strong></label>
+                <input type="number" id="valorRecebido" step="0.01" placeholder="R$" autocomplete="off">
+                <span id="troco"></span>
+            </div>
         </div>
         <button class="btn-finalizar" onclick="finalizarVenda()">✔ Finalizar venda</button>
         <button class="btn-orcamento" onclick="gerarOrcamento()">📄 Gerar orçamento</button>
@@ -206,6 +250,7 @@
             if (carrinho.length && !confirm('Tirar todos os itens do carrinho?')) return;
             carrinho = [];
             desligarOrcamento();
+            limparPagamento();
             mostrarCarrinho();
             atualizarCaixaEstoque();
         }
@@ -235,24 +280,96 @@
             html += '</table>';
             area.innerHTML = html;
             document.getElementById('totalCarrinho').textContent = dinheiro(total);
+            calcularTroco();
         }
 
         // ---------- Finalizar e comprovante ----------
 
+        // ---------- Forma de pagamento ----------
+
+        let formaPagamento = null;
+
+        // Clicou em CARTÃO: mostra as opções DÉBITO ou CRÉDITO
+        function escolherCartao() {
+            formaPagamento = null;
+            document.querySelectorAll('#formasPagamento button').forEach(b =>
+                b.classList.toggle('escolhida', b.id === 'btnCartao'));
+            document.getElementById('opcoesCartao').style.display = 'inline';
+            document.getElementById('areaDinheiro').style.display = 'none';
+            calcularTroco();
+        }
+
+        function escolherPagamento(forma) {
+            formaPagamento = forma;
+            const cartao = forma.startsWith('CARTÃO');
+            document.querySelectorAll('#formasPagamento button').forEach(b =>
+                b.classList.toggle('escolhida', b.dataset.forma === forma || (cartao && b.id === 'btnCartao')));
+            document.getElementById('opcoesCartao').style.display = cartao ? 'inline' : 'none';
+            const dinheiro = forma === 'DINHEIRO';
+            document.getElementById('areaDinheiro').style.display = dinheiro ? 'block' : 'none';
+            if (dinheiro) document.getElementById('valorRecebido').focus();
+            calcularTroco();
+        }
+
+        function totalDoCarrinho() {
+            return carrinho.reduce((soma, i) => soma + i.quantidade * i.preco, 0);
+        }
+
+        // Dinheiro: mostra o troco enquanto digita o valor recebido
+        function calcularTroco() {
+            const campo = document.getElementById('troco');
+            const recebido = parseFloat(document.getElementById('valorRecebido').value.replace(',', '.'));
+            if (formaPagamento !== 'DINHEIRO' || isNaN(recebido)) { campo.textContent = ''; return; }
+            const troco = recebido - totalDoCarrinho();
+            campo.style.color = troco < 0 ? '#b00020' : '#155724';
+            campo.textContent = troco < 0
+                ? `Faltam ${dinheiro(-troco)}`
+                : `Troco: ${dinheiro(troco)}`;
+        }
+
+        function limparPagamento() {
+            formaPagamento = null;
+            document.querySelectorAll('#formasPagamento button').forEach(b => b.classList.remove('escolhida'));
+            document.getElementById('opcoesCartao').style.display = 'none';
+            document.getElementById('valorRecebido').value = '';
+            document.getElementById('areaDinheiro').style.display = 'none';
+            document.getElementById('troco').textContent = '';
+        }
+
         function finalizarVenda() {
             if (carrinho.length === 0) { alert('O carrinho está vazio.'); return; }
-            if (!confirm('Finalizar a venda?')) return;
+            if (!formaPagamento) {
+                alert(document.getElementById('btnCartao').classList.contains('escolhida')
+                    ? 'Escolha se o cartão é DÉBITO ou CRÉDITO.'
+                    : 'Escolha a forma de pagamento.');
+                return;
+            }
+            const recebidoTexto = document.getElementById('valorRecebido').value;
+            if (formaPagamento === 'DINHEIRO' && recebidoTexto) {
+                const recebido = parseFloat(recebidoTexto.replace(',', '.'));
+                if (recebido < totalDoCarrinho()) {
+                    alert(`O valor recebido é menor que o total (${dinheiro(totalDoCarrinho())}).`);
+                    return;
+                }
+            }
+            if (!confirm(`Finalizar a venda?\n\nTotal: ${dinheiro(totalDoCarrinho())}\nPagamento: ${formaPagamento}`)) return;
 
             fetch('/api/pedidos', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     itens: carrinho.map(i => ({produto_id: i.produto_id, quantidade: i.quantidade})),
-                    orcamento_id: orcamentoAtual ? orcamentoAtual.id : null
+                    orcamento_id: orcamentoAtual ? orcamentoAtual.id : null,
+                    cliente: document.getElementById('cliente').value,
+                    telefone: document.getElementById('telefone').value,
+                    endereco: document.getElementById('endereco').value,
+                    forma_pagamento: formaPagamento,
+                    valor_recebido: formaPagamento === 'DINHEIRO' ? recebidoTexto : ''
                 })
             }).then(r => r.json()).then(res => {
                 if (!res.sucesso) { alert(res.mensagem); return; }
                 mostrarComprovante(res);
+                limparPagamento();
                 carrinho = [];
                 desligarOrcamento();
                 mostrarCarrinho();
@@ -278,10 +395,16 @@
                 <hr>
                 <div>Venda nº: ${res.numero}</div>
                 <div>Data: ${res.data}</div>
+                ${res.cliente ? `<div>Cliente: ${res.cliente}</div>` : ''}
+                ${res.telefone ? `<div>Telefone: ${res.telefone}</div>` : ''}
+                ${res.endereco ? `<hr><div><strong>🚚 ENTREGAR EM:</strong><br>${res.endereco}</div>` : ''}
                 <hr>
                 <table>${linhas}</table>
                 <hr>
                 <div class="total-cupom">TOTAL: ${dinheiro(res.total)}</div>
+                <div>Pagamento: <strong>${res.forma_pagamento}</strong></div>
+                ${res.valor_recebido !== null ? `<div>Valor recebido: ${dinheiro(res.valor_recebido)}</div>
+                <div><strong>Troco: ${dinheiro(res.troco)}</strong></div>` : ''}
                 <hr>
                 <div class="centro">Obrigado pela preferência!</div>
             `;
@@ -318,6 +441,7 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     cliente, telefone, validade,
+                    endereco: document.getElementById('endereco').value,
                     itens: carrinho.map(i => ({produto_id: i.produto_id, quantidade: i.quantidade}))
                 })
             }).then(r => r.json()).then(res => {
@@ -345,6 +469,7 @@
                 <hr>
                 <div>Cliente: ${o.cliente}</div>
                 ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
+                ${o.endereco ? `<div>Entrega: ${o.endereco}</div>` : ''}
                 <div>Data: ${o.data}</div>
                 <div><strong>Válido até: ${o.valido_ate}</strong></div>
                 <hr>
@@ -377,6 +502,7 @@
                                                   preco: i.preco, unidade: i.unidade, quantidade: i.quantidade}));
                     document.getElementById('cliente').value = o.cliente;
                     document.getElementById('telefone').value = o.telefone;
+                    document.getElementById('endereco').value = o.endereco || '';
                     const banner = document.getElementById('bannerOrcamento');
                     banner.innerHTML = `📄 <strong>Venda do orçamento nº ${o.id}</strong> – cliente <strong>${o.cliente}</strong>
                         (feito em ${o.data}). Os preços do orçamento foram mantidos.
@@ -405,6 +531,7 @@
             document.getElementById('bannerOrcamento').style.display = 'none';
             document.getElementById('cliente').value = '';
             document.getElementById('telefone').value = '';
+            document.getElementById('endereco').value = '';
             validadePadrao();
             if (window.location.search) history.replaceState(null, '', '/vendas');
         }
@@ -424,13 +551,15 @@
             fetch('/api/vendas')
                 .then(r => r.json())
                 .then(vendas => {
-                    let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Data</th><th>Ação</th></tr>';
+                    let html = '<tr><th>ID</th><th>Produto</th><th>Quantidade</th><th>Valor Total</th><th>Pagamento</th><th>Cliente</th><th>Data</th><th>Ação</th></tr>';
                     vendas.forEach(v => {
                         html += `<tr>
                             <td>${v.id}</td>
                             <td>${v.produto}</td>
                             <td>${v.quantidade} ${v.unidade}</td>
                             <td>${dinheiro(v.valor_total)}</td>
+                            <td>${v.forma_pagamento || '-'}</td>
+                            <td>${v.cliente || '-'}${v.endereco_entrega ? '<br><small>🚚 ' + v.endereco_entrega + '</small>' : ''}</td>
                             <td>${v.data}</td>
                             <td>${EH_ADMIN ? `<button class="btn-cancelar" onclick="cancelarVenda(${v.id}, '${v.produto}', ${v.quantidade})">Cancelar</button>` : '-'}</td>
                         </tr>`;
@@ -469,8 +598,58 @@
         });
 
         mostrarCarrinho();
+        // ---------- Clientes cadastrados ----------
+        // Ao digitar o nome, aparecem os clientes cadastrados.
+        // Escolheu um cliente da lista: o telefone é preenchido sozinho.
+        let listaClientes = [];
+        function carregarClientes() {
+            fetch('/api/clientes')
+                .then(r => r.json())
+                .then(clientes => {
+                    listaClientes = clientes;
+                    document.getElementById('listaClientes').innerHTML = clientes
+                        .map(c => `<option value="${c.nome}">${c.telefone || ''}</option>`).join('');
+                });
+        }
+        document.getElementById('cliente').addEventListener('input', () => {
+            const nome = document.getElementById('cliente').value.trim().toUpperCase();
+            const achado = listaClientes.find(c => c.nome === nome);
+            if (!achado) return;
+            if (achado.telefone) document.getElementById('telefone').value = achado.telefone;
+            if (achado.endereco) document.getElementById('endereco').value = achado.endereco;
+        });
+
+        document.getElementById('valorRecebido').addEventListener('input', calcularTroco);
+        document.getElementById('valorRecebido').addEventListener('keydown', evento => {
+            if (evento.key === 'Enter') finalizarVenda();
+        });
+
+        // Cliente, telefone e endereço sempre em LETRAS MAIÚSCULAS
+        ['cliente', 'endereco'].forEach(id => {
+            const campo = document.getElementById(id);
+            campo.classList.add('maiusculo');
+            campo.addEventListener('input', () => {
+                const pos = campo.selectionStart;
+                campo.value = campo.value.toUpperCase();
+                campo.setSelectionRange(pos, pos);
+            });
+        });
+
+        carregarClientes();
         carregarProdutos();
         carregarVendas();
+        // ENTER nos dados do cliente: Cliente → Telefone → Entrega → forma de pagamento
+        const ORDEM_CLIENTE = ['cliente', 'telefone', 'endereco'];
+        ORDEM_CLIENTE.forEach((id, i) => {
+            document.getElementById(id).addEventListener('keydown', evento => {
+                if (evento.key !== 'Enter') return;
+                evento.preventDefault();
+                const proximo = ORDEM_CLIENTE[i + 1];
+                if (proximo) document.getElementById(proximo).focus();
+                else document.querySelector('#formasPagamento button').focus();   // vai para DINHEIRO
+            });
+        });
+
         ['cliente', 'validade'].forEach(id => {
             document.getElementById(id).addEventListener('input', e => {
                 if (e.target.value) e.target.classList.remove('campo-erro');

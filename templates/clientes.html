@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Clientes</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        input, button, select { padding: 8px; margin: 5px; }
+        table { border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+        nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
+                letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+                padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
+        nav a:hover { background: #ff8a3d; }
+        nav a.ativo { background: #ffffff; color: #e65100; }
+        .editando { background: #fff8d6; padding: 10px; border-radius: 5px; }
+        #btnCancelar { display: none; }
+        #endereco { width: 320px; }
+        #busca { width: 320px; }
+        .dica { color: #666; font-size: 14px; margin-left: 5px; }
+        .vazio { color: #888; font-style: italic; }
+        #formulario input { text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    {% set pagina = 'clientes' %}
+    {% include '_menu.html' %}
+
+    <h1>Clientes</h1>
+
+    <div id="formulario">
+        <h2 id="tituloFormulario">Novo Cliente</h2>
+        <input type="text" id="nome" placeholder="Nome *" autocomplete="off">
+        <input type="text" id="telefone" placeholder="Telefone" autocomplete="off">
+        <input type="text" id="documento" placeholder="CPF ou CNPJ (opcional)" autocomplete="off">
+        <input type="text" id="endereco" placeholder="Endereço (rua, número, bairro)" autocomplete="off">
+        <button id="btnSalvar" onclick="salvarCliente()">Cadastrar</button>
+        <button id="btnCancelar" onclick="cancelarEdicao()">Cancelar</button>
+        <div class="dica">Só o nome é obrigatório. <strong>Enter</strong> pula para o próximo campo; no Endereço, o Enter salva.</div>
+    </div>
+
+    <h2>Clientes cadastrados (<span id="totalClientes">0</span>)</h2>
+    <input type="text" id="busca" placeholder="🔎 Procurar por nome, telefone ou CPF..." autocomplete="off">
+    <table id="tabelaClientes"></table>
+
+    <script>
+        const EH_ADMIN = {{ 'true' if admin else 'false' }};
+        const CAMPOS = ['nome', 'telefone', 'documento', 'endereco'];
+        let listaClientes = [];
+        let idEmEdicao = null;
+
+        function carregarClientes() {
+            fetch('/api/clientes')
+                .then(r => r.json())
+                .then(clientes => {
+                    listaClientes = clientes;
+                    document.getElementById('totalClientes').textContent = clientes.length;
+                    mostrarTabela();
+                });
+        }
+
+        // Mostra a tabela, filtrando pelo que foi digitado na busca
+        function mostrarTabela() {
+            const termo = document.getElementById('busca').value.trim().toUpperCase();
+            const soNumeros = termo.replace(/\D/g, '');
+            const filtrados = listaClientes.filter(c =>
+                !termo
+                || c.nome.includes(termo)
+                || (soNumeros && c.telefone.replace(/\D/g, '').includes(soNumeros))
+                || (soNumeros && c.documento.replace(/\D/g, '').includes(soNumeros)));
+
+            if (filtrados.length === 0) {
+                document.getElementById('tabelaClientes').innerHTML =
+                    `<tr><td class="vazio">${termo ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado ainda.'}</td></tr>`;
+                return;
+            }
+
+            let html = '<tr><th>Nome</th><th>Telefone</th><th>CPF / CNPJ</th><th>Endereço</th><th>Cadastrado em</th><th>Ações</th></tr>';
+            filtrados.forEach(c => {
+                html += `<tr>
+                    <td>${c.nome}</td>
+                    <td>${c.telefone || '-'}</td>
+                    <td>${c.documento || '-'}</td>
+                    <td>${c.endereco || '-'}</td>
+                    <td>${c.criado_em}</td>
+                    <td>
+                        <button onclick="editarCliente(${c.id})">Editar</button>
+                        ${EH_ADMIN ? `<button onclick="excluirCliente(${c.id})">Excluir</button>` : ''}
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('tabelaClientes').innerHTML = html;
+        }
+
+        function limparFormulario() {
+            CAMPOS.forEach(c => document.getElementById(c).value = '');
+        }
+
+        function editarCliente(id) {
+            const c = listaClientes.find(item => item.id === id);
+            if (!c) return;
+            idEmEdicao = id;
+            CAMPOS.forEach(campo => document.getElementById(campo).value = c[campo]);
+            document.getElementById('tituloFormulario').textContent = 'Editando: ' + c.nome;
+            document.getElementById('btnSalvar').textContent = 'Salvar alterações';
+            document.getElementById('btnCancelar').style.display = 'inline-block';
+            document.getElementById('formulario').classList.add('editando');
+            window.scrollTo(0, 0);
+        }
+
+        function cancelarEdicao() {
+            idEmEdicao = null;
+            limparFormulario();
+            document.getElementById('tituloFormulario').textContent = 'Novo Cliente';
+            document.getElementById('btnSalvar').textContent = 'Cadastrar';
+            document.getElementById('btnCancelar').style.display = 'none';
+            document.getElementById('formulario').classList.remove('editando');
+        }
+
+        function salvarCliente() {
+            const dados = {};
+            CAMPOS.forEach(c => dados[c] = document.getElementById(c).value);
+            const editando = idEmEdicao !== null;
+            fetch(editando ? '/api/clientes/' + idEmEdicao : '/api/clientes', {
+                method: editando ? 'PUT' : 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(dados)
+            }).then(r => r.json()).then(res => {
+                if (res.sucesso) {
+                    alert(editando ? 'Cliente atualizado!' : 'Cliente cadastrado!');
+                    cancelarEdicao();
+                    carregarClientes();
+                    document.getElementById('nome').focus();   // pronto para o próximo cliente
+                } else {
+                    alert(res.mensagem);
+                }
+            });
+        }
+
+        function excluirCliente(id) {
+            const c = listaClientes.find(item => item.id === id);
+            if (!c || !confirm(`Excluir o cliente ${c.nome}?`)) return;
+            fetch('/api/clientes/' + id, {method: 'DELETE'})
+                .then(r => r.json())
+                .then(res => {
+                    if (res.sucesso) carregarClientes();
+                    else alert(res.mensagem);
+                });
+        }
+
+        CAMPOS.forEach(campo => {
+            const caixa = document.getElementById(campo);
+            // ENTER: vai para o próximo campo. No último (Endereço), salva o cliente.
+            caixa.addEventListener('keydown', evento => {
+                if (evento.key !== 'Enter') return;
+                evento.preventDefault();
+                const proximo = CAMPOS[CAMPOS.indexOf(campo) + 1];
+                if (proximo) document.getElementById(proximo).focus();
+                else salvarCliente();
+            });
+            // Tudo o que for digitado vira LETRA MAIÚSCULA
+            caixa.addEventListener('input', () => {
+                const pos = caixa.selectionStart;
+                caixa.value = caixa.value.toUpperCase();
+                caixa.setSelectionRange(pos, pos);
+            });
+        });
+        document.getElementById('busca').addEventListener('input', mostrarTabela);
+
+        carregarClientes();
+    </script>
+</body>
+</html>

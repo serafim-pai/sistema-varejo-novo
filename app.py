@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, redirect
 from flask import session as login          # "login" guarda quem está usando o sistema
 from werkzeug.security import generate_password_hash, check_password_hash
-from database import Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, UNIDADES
+from database import Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, Cliente, UNIDADES, FORMAS_PAGAMENTO
 from datetime import datetime, timedelta
 import os
 import secrets
@@ -40,6 +40,9 @@ def so_admin(caminho, metodo):
         return True
     # Cadastrar, editar, excluir produto e dar entrada no estoque
     if caminho.startswith('/api/produtos') and metodo != 'GET':
+        return True
+    # Excluir cliente
+    if caminho.startswith('/api/clientes/') and metodo == 'DELETE':
         return True
     # Cancelar venda (devolve produto ao estoque)
     if caminho.startswith('/api/vendas/') and metodo == 'DELETE':
@@ -188,6 +191,91 @@ def pagina_orcamentos():
 @app.route('/usuarios')
 def pagina_usuarios():
     return render_template('usuarios.html')
+
+
+@app.route('/clientes')
+def pagina_clientes():
+    return render_template('clientes.html')
+
+
+# ---------- CLIENTES (balcão cadastra e edita; só o administrador exclui) ----------
+
+def validar_cliente(dados):
+    """Confere os dados do cliente. Devolve (erro, None) ou (None, dados_limpos)."""
+    nome = str(dados.get('nome', '')).strip().upper()
+    telefone = str(dados.get('telefone', '')).strip().upper()
+    endereco = str(dados.get('endereco', '')).strip().upper()
+    documento = str(dados.get('documento', '')).strip().upper()
+
+    if sum(1 for letra in nome if letra.isalpha()) < 2:
+        return 'Digite o nome do cliente.', None
+    if telefone and sum(1 for c in telefone if c.isdigit()) < 8:
+        return 'O telefone precisa ter pelo menos 8 números.', None
+    if documento:
+        numeros = ''.join(c for c in documento if c.isdigit())
+        if len(numeros) not in (11, 14):
+            return 'O CPF precisa ter 11 números (ou o CNPJ, 14 números).', None
+    return None, {'nome': nome, 'telefone': telefone, 'endereco': endereco, 'documento': documento}
+
+
+def cliente_para_json(c):
+    return {'id': c.id, 'nome': c.nome, 'telefone': c.telefone or '',
+            'endereco': c.endereco or '', 'documento': c.documento or '',
+            'criado_em': c.criado_em.strftime('%d/%m/%Y') if c.criado_em else ''}
+
+
+@app.route('/api/clientes', methods=['GET', 'POST'])
+def clientes():
+    session = Session()
+
+    if request.method == 'POST':
+        erro, limpos = validar_cliente(request.json or {})
+        if erro:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': erro})
+        # Evita cadastrar o mesmo cliente duas vezes (mesmo nome e mesmo telefone)
+        repetido = session.query(Cliente).filter_by(nome=limpos['nome'], telefone=limpos['telefone']).first()
+        if repetido:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Este cliente já está cadastrado.'})
+        cliente = Cliente(**limpos)
+        session.add(cliente)
+        session.commit()
+        resultado = cliente_para_json(cliente)
+        session.close()
+        return jsonify({'sucesso': True, 'cliente': resultado})
+
+    todos = session.query(Cliente).order_by(Cliente.nome).all()
+    resultado = [cliente_para_json(c) for c in todos]
+    session.close()
+    return jsonify(resultado)
+
+
+@app.route('/api/clientes/<int:id>', methods=['PUT', 'DELETE'])
+def alterar_cliente(id):
+    session = Session()
+    cliente = session.query(Cliente).filter_by(id=id).first()
+    if not cliente:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Cliente não encontrado.'})
+
+    if request.method == 'DELETE':
+        session.delete(cliente)
+        session.commit()
+        session.close()
+        return jsonify({'sucesso': True})
+
+    erro, limpos = validar_cliente(request.json or {})
+    if erro:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': erro})
+    cliente.nome = limpos['nome']
+    cliente.telefone = limpos['telefone']
+    cliente.endereco = limpos['endereco']
+    cliente.documento = limpos['documento']
+    session.commit()
+    session.close()
+    return jsonify({'sucesso': True})
 
 
 # ---------- USUÁRIOS (só o administrador master) ----------
@@ -361,6 +449,11 @@ def validar_produto(dados):
 
 # ---------- API DE PRODUTOS ----------
 
+@app.route('/api/formas-pagamento')
+def lista_formas_pagamento():
+    return jsonify(FORMAS_PAGAMENTO)
+
+
 @app.route('/api/unidades')
 def lista_unidades():
     return jsonify(UNIDADES)
@@ -475,6 +568,20 @@ def entrada_estoque(id):
 
 # ---------- API DE VENDAS ----------
 
+def dados_do_cliente(session, dados):
+    """Lê o cliente da venda (tudo opcional). Se o nome for de um cliente cadastrado,
+    liga a venda a ele. Devolve (nome, telefone, endereco, cliente_id)."""
+    nome = str(dados.get('cliente') or '').strip().upper() or None
+    telefone = str(dados.get('telefone') or '').strip() or None
+    endereco = str(dados.get('endereco') or '').strip().upper() or None
+    cliente_id = None
+    if nome:
+        cadastrado = session.query(Cliente).filter_by(nome=nome).first()
+        if cadastrado:
+            cliente_id = cadastrado.id
+    return nome, telefone, endereco, cliente_id
+
+
 def custo_da_venda(produto, quantidade):
     """Quanto a loja pagou pelos itens vendidos (usa o preço de compra de hoje).
     Se o produto não tem preço de compra, devolve None (lucro desconhecido)."""
@@ -521,7 +628,10 @@ def vendas():
             'unidade': (produto.unidade if produto else None) or 'UN',
             'quantidade': v.quantidade,
             'valor_total': v.valor_total,
-            'data': v.data.strftime('%d/%m/%Y %H:%M')
+            'data': v.data.strftime('%d/%m/%Y %H:%M'),
+            'cliente': v.cliente or '',
+            'endereco_entrega': v.endereco_entrega or '',
+            'forma_pagamento': v.forma_pagamento or ''
         })
     session.close()
     return jsonify(resultado)
@@ -554,6 +664,21 @@ def finalizar_pedido():
     session = Session()
     itens = (request.json or {}).get('itens', [])
     orcamento_id = (request.json or {}).get('orcamento_id')
+    cliente_nome, cliente_telefone, cliente_endereco, cliente_id = dados_do_cliente(session, request.json or {})
+
+    # Forma de pagamento (obrigatória)
+    forma_pagamento = str((request.json or {}).get('forma_pagamento') or '').strip().upper()
+    if forma_pagamento not in FORMAS_PAGAMENTO:
+        session.close()
+        return jsonify({'sucesso': False, 'mensagem': 'Escolha a forma de pagamento.'})
+    valor_recebido = None
+    texto_recebido = str((request.json or {}).get('valor_recebido') or '').strip().replace(',', '.')
+    if forma_pagamento == 'DINHEIRO' and texto_recebido:
+        try:
+            valor_recebido = float(texto_recebido)
+        except ValueError:
+            session.close()
+            return jsonify({'sucesso': False, 'mensagem': 'Digite um valor recebido válido.'})
 
     if not itens:
         session.close()
@@ -603,6 +728,14 @@ def finalizar_pedido():
         for item in session.query(OrcamentoItem).filter_by(orcamento_id=orcamento.id).all():
             precos_orcamento[item.produto_id] = item.preco
 
+    # Confere se o dinheiro recebido dá para pagar (antes de mexer no estoque)
+    if valor_recebido is not None:
+        total_previsto = sum(q * precos_orcamento.get(pid, produtos[pid].preco) for pid, q in quantidades.items())
+        if valor_recebido + 0.001 < total_previsto:
+            session.close()
+            return jsonify({'sucesso': False,
+                            'mensagem': f'Valor recebido (R$ {valor_recebido:.2f}) é menor que o total (R$ {total_previsto:.2f}).'})
+
     # 2) Tudo certo: dá baixa no estoque e registra as vendas
     agora = datetime.now()
     comprovante = []
@@ -615,7 +748,10 @@ def finalizar_pedido():
         produto.quantidade -= quantidade
         venda = Venda(produto_id=produto_id, quantidade=quantidade,
                       valor_total=subtotal, data=agora,
-                      custo_total=custo_da_venda(produto, quantidade))
+                      custo_total=custo_da_venda(produto, quantidade),
+                      cliente_id=cliente_id, cliente=cliente_nome,
+                      telefone=cliente_telefone, endereco_entrega=cliente_endereco,
+                      forma_pagamento=forma_pagamento)
         session.add(venda)
         session.flush()
         ids.append(venda.id)
@@ -635,7 +771,13 @@ def finalizar_pedido():
         'numero': min(ids),
         'data': agora.strftime('%d/%m/%Y %H:%M'),
         'itens': comprovante,
-        'total': total
+        'total': total,
+        'cliente': cliente_nome or '',
+        'telefone': cliente_telefone or '',
+        'endereco': cliente_endereco or '',
+        'forma_pagamento': forma_pagamento,
+        'valor_recebido': valor_recebido,
+        'troco': (valor_recebido - total) if valor_recebido is not None else None
     })
 
 
@@ -665,6 +807,7 @@ def orcamento_para_json(session, orcamento):
         'id': orcamento.id,
         'cliente': orcamento.cliente,
         'telefone': orcamento.telefone or '',
+        'endereco': orcamento.endereco or '',
         'data': orcamento.data.strftime('%d/%m/%Y %H:%M'),
         'validade_dias': orcamento.validade_dias,
         'valido_ate': (orcamento.data + timedelta(days=orcamento.validade_dias)).strftime('%d/%m/%Y'),
@@ -686,6 +829,7 @@ def orcamentos():
         dados = request.json or {}
         cliente = str(dados.get('cliente', '')).strip().upper()
         telefone = str(dados.get('telefone', '')).strip()
+        endereco = str(dados.get('endereco', '') or '').strip().upper()
         itens = dados.get('itens', [])
 
         # Data de validade escolhida pelo vendedor (formato AAAA-MM-DD)
@@ -706,8 +850,8 @@ def orcamentos():
             session.close()
             return jsonify({'sucesso': False, 'mensagem': 'O carrinho está vazio.'})
 
-        orcamento = Orcamento(cliente=cliente, telefone=telefone, data=datetime.now(),
-                              validade_dias=validade_dias)
+        orcamento = Orcamento(cliente=cliente, telefone=telefone, endereco=endereco,
+                              data=datetime.now(), validade_dias=validade_dias)
         session.add(orcamento)
         session.flush()
 
@@ -821,6 +965,12 @@ def mais_vendidos():
     # Ordena do que mais vendeu para o que menos vendeu
     ranking = sorted(resumo.values(), key=lambda item: item['quantidade_vendida'], reverse=True)
 
+    # Total vendido por forma de pagamento
+    por_pagamento = {}
+    for v in todas_vendas:
+        forma = v.forma_pagamento or 'NÃO INFORMADO'
+        por_pagamento[forma] = por_pagamento.get(forma, 0.0) + v.valor_total
+
     custo_total = sum(i['custo'] for i in ranking)
     lucro_total = sum(i['lucro'] for i in ranking if i['lucro'] is not None)
 
@@ -831,7 +981,9 @@ def mais_vendidos():
         'valor_vendido': sum(v.valor_total for v in todas_vendas),
         'custo_total': custo_total,
         'lucro_total': lucro_total,
-        'vendas_sem_custo': sum(i['sem_custo'] for i in ranking)
+        'vendas_sem_custo': sum(i['sem_custo'] for i in ranking),
+        'por_pagamento': [{'forma': f, 'valor': v}
+                          for f, v in sorted(por_pagamento.items(), key=lambda x: -x[1])]
     })
 
 

@@ -164,7 +164,7 @@
                 html += `<tr class="linha-${o.situacao}">
                     <td><strong>${o.id}</strong></td>
                     <td>${o.data}<br><span class="idade">${textoIdade(o.dias)}</span></td>
-                    <td><strong>${o.cliente}</strong>${o.telefone ? '<br>📞 ' + o.telefone : ''}</td>
+                    <td><strong>${o.cliente}</strong>${o.telefone ? '<br>📞 ' + o.telefone : ''}${o.endereco ? '<br>🚚 ' + o.endereco : ''}</td>
                     <td class="resumo">${resumo}</td>
                     <td><strong>${dinheiro(o.total)}</strong></td>
                     <td>${textoSituacao(o)}</td>
@@ -195,6 +195,7 @@
                 <hr>
                 <div>Cliente: ${o.cliente}</div>
                 ${o.telefone ? `<div>Telefone: ${o.telefone}</div>` : ''}
+                ${o.endereco ? `<div>Entrega: ${o.endereco}</div>` : ''}
                 <div>Data: ${o.data}</div>
                 <div><strong>Válido até: ${o.valido_ate}</strong></div>
                 <hr>

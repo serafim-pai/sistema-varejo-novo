@@ -45,6 +45,9 @@
     </div>
     <div class="aviso-custo" id="avisoVendasSemCusto" style="display:none"></div>
 
+    <h2>💳 Vendas por Forma de Pagamento</h2>
+    <div class="cards" id="cardsPagamento"></div>
+
     <h2>🏆 Produtos Mais Vendidos</h2>
     <div class="destaque" id="campeao">Nenhuma venda registrada ainda.</div>
     <table id="tabelaMaisVendidos"></table>
@@ -163,6 +166,10 @@
                     document.getElementById('valorVendido').textContent = dinheiro(dados.valor_vendido);
                     document.getElementById('custoVendas').textContent = dinheiro(dados.custo_total);
                     document.getElementById('lucroVendas').innerHTML = textoLucro(dados.lucro_total);
+
+                    document.getElementById('cardsPagamento').innerHTML = dados.por_pagamento.length
+                        ? dados.por_pagamento.map(p => `<div class="card">${p.forma}<span class="numero">${dinheiro(p.valor)}</span></div>`).join('')
+                        : '<div class="card">Nenhuma venda registrada ainda.</div>';
 
                     const avisoVendas = document.getElementById('avisoVendasSemCusto');
                     if (dados.vendas_sem_custo > 0) {

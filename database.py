@@ -7,6 +7,9 @@ Base = declarative_base()
 engine = create_engine('sqlite:///varejo.db')
 Session = sessionmaker(bind=engine)
 
+# Formas de pagamento aceitas (sem fiado)
+FORMAS_PAGAMENTO = ['DINHEIRO', 'PIX', 'CARTÃO DE DÉBITO', 'CARTÃO DE CRÉDITO']
+
 # Unidades de medida que o sistema aceita
 UNIDADES = ['UN', 'SACO', 'M³', 'M²', 'M', 'KG', 'MILHEIRO', 'LATA', 'CAIXA', 'BARRA', 'ROLO', 'LITRO']
 
@@ -38,6 +41,18 @@ class Usuario(Base):
     criado_em = Column(DateTime, default=datetime.now)
 
 
+class Cliente(Base):
+    """Cliente da loja (usado nos orçamentos, nas vendas e no fiado)."""
+    __tablename__ = 'clientes'
+
+    id = Column(Integer, primary_key=True)
+    nome = Column(String(100), nullable=False)
+    telefone = Column(String(30), nullable=True)
+    endereco = Column(String(200), nullable=True)
+    documento = Column(String(20), nullable=True)   # CPF ou CNPJ (opcional)
+    criado_em = Column(DateTime, default=datetime.now)
+
+
 class Venda(Base):
     __tablename__ = 'vendas'
 
@@ -47,6 +62,12 @@ class Venda(Base):
     valor_total = Column(Float, nullable=False)
     custo_total = Column(Float, nullable=True)   # quanto a loja pagou por esses itens (preço de compra do dia)
     data = Column(DateTime, default=datetime.now)
+    # Cliente da venda (opcional) e endereço de entrega
+    cliente_id = Column(Integer, nullable=True)
+    cliente = Column(String(100), nullable=True)
+    telefone = Column(String(30), nullable=True)
+    endereco_entrega = Column(String(200), nullable=True)
+    forma_pagamento = Column(String(30), nullable=True)   # DINHEIRO, PIX, CARTÃO DE DÉBITO, CARTÃO DE CRÉDITO
 
 
 class Orcamento(Base):
@@ -56,6 +77,7 @@ class Orcamento(Base):
     id = Column(Integer, primary_key=True)
     cliente = Column(String(100), nullable=False)
     telefone = Column(String(30), nullable=True)
+    endereco = Column(String(200), nullable=True)                      # endereço de entrega
     data = Column(DateTime, default=datetime.now)
     validade_dias = Column(Integer, nullable=False, default=7)
     situacao = Column(String(20), nullable=False, default='ABERTO')   # ABERTO, VIROU VENDA, CANCELADO
@@ -97,3 +119,18 @@ colunas_vendas = [c['name'] for c in inspect(engine).get_columns('vendas')]
 if 'custo_total' not in colunas_vendas:
     with engine.begin() as conexao:
         conexao.execute(text("ALTER TABLE vendas ADD COLUMN custo_total FLOAT"))
+
+# Vendas e orçamentos: cliente e endereço de entrega
+novas_colunas = [
+    ('vendas', 'cliente_id', 'INTEGER'),
+    ('vendas', 'cliente', 'VARCHAR(100)'),
+    ('vendas', 'telefone', 'VARCHAR(30)'),
+    ('vendas', 'endereco_entrega', 'VARCHAR(200)'),
+    ('vendas', 'forma_pagamento', 'VARCHAR(30)'),
+    ('orcamentos', 'endereco', 'VARCHAR(200)'),
+]
+for tabela, coluna, tipo in novas_colunas:
+    existentes = [c['name'] for c in inspect(engine).get_columns(tabela)]
+    if coluna not in existentes:
+        with engine.begin() as conexao:
+            conexao.execute(text(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}"))

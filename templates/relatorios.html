@@ -181,7 +181,7 @@
                         ? htmlVend : '<tr><td>Nenhuma venda registrada ainda.</td></tr>';
 
                     document.getElementById('cardsPagamento').innerHTML = dados.por_pagamento.length
-                        ? dados.por_pagamento.map(p => `<div class="card">${p.forma}<span class="numero">${dinheiro(p.valor)}</span></div>`).join('')
+                        ? dados.por_pagamento.map(p => `<div class="card">${escapar(p.forma)}<span class="numero">${dinheiro(p.valor)}</span></div>`).join('')
                         : '<div class="card">Nenhuma venda registrada ainda.</div>';
 
                     const avisoVendas = document.getElementById('avisoVendasSemCusto');

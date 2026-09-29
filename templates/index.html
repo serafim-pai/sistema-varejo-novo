@@ -308,7 +308,7 @@
                 .then(r => r.json())
                 .then(unidades => {
                     document.getElementById('unidade').innerHTML =
-                        unidades.map(u => `<option value="${u}">${u}</option>`).join('');
+                        unidades.map(u => `<option value="${escapar(u)}">${escapar(u)}</option>`).join('');
                 });
 
             ['nome', 'precoCompra', 'margem', 'preco', 'quantidade', 'categoria'].forEach(campo => {

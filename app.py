@@ -39,7 +39,7 @@ def token_csrf_invalido(erro):
     if request.path.startswith('/api/'):
         return jsonify({'sucesso': False,
                         'mensagem': 'Sessão expirada ou inválida. Recarregue a página e tente novamente.'}), 400
-    return redirect('/login')
+    return redirect('/login?expirou=1')
 
 
 # ---------- LOGIN: quem pode entrar e onde ----------
@@ -140,7 +140,7 @@ def dados_para_as_telas():
 
 @app.route('/login', methods=['GET', 'POST'])
 def pagina_login():
-    erro = None
+    erro = 'Sua sessão expirou. Tente entrar de novo.' if request.args.get('expirou') else None
     email = ''
     if request.method == 'POST':
         email = request.form.get('acesso', '').strip().lower()
@@ -1134,4 +1134,8 @@ def mais_vendidos():
 
 if __name__ == '__main__':
     debug = os.environ.get('FLASK_DEBUG') == '1'
-    app.run(debug=debug)
+    # O reiniciador automático (reinicia sozinho quando um arquivo é salvo) fica
+    # sempre ligado, mesmo sem o modo debug — assim uma alteração no código nunca
+    # fica "no ar" à toa. O depurador interativo (o que é perigoso deixar ligado)
+    # só liga de verdade com FLASK_DEBUG=1.
+    app.run(debug=debug, use_reloader=True)

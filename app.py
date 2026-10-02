@@ -105,7 +105,7 @@ def conferir_login():
     session.close()
 
     if not usuario:
-        login.clear()
+        login.pop('usuario_id', None)
         if caminho.startswith('/api/'):
             return jsonify({'sucesso': False, 'mensagem': 'Faça login novamente.'}), 401
         return redirect('/login')

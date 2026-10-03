@@ -2,9 +2,13 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import os
 
 Base = declarative_base()
-engine = create_engine('sqlite:///varejo.db')
+# O banco fica sempre ao lado deste arquivo, não importa de onde o sistema é ligado
+# (necessário na hospedagem online, onde a pasta de trabalho é outra).
+CAMINHO_BANCO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'varejo.db')
+engine = create_engine('sqlite:///' + CAMINHO_BANCO)
 Session = sessionmaker(bind=engine)
 
 # Formas de pagamento aceitas (sem fiado)

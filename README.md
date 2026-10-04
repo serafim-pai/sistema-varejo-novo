@@ -107,6 +107,12 @@ sistema-varejo-novo/
 4. Na primeira vez, crie o **administrador master** (nome, e-mail e senha).
 5. Em **Usuários**, crie os usuários do balcão.
 
+## 🌐 Sistema online
+
+O sistema está no ar (PythonAnywhere, plano gratuito): **https://serafimpai.pythonanywhere.com**
+
+Para atualizar o sistema online depois de mudar o código: no console do PythonAnywhere, entre na pasta do projeto, rode `git pull` e clique em **Reload** na aba **Web**.
+
 ## 🚀 Próximos passos
 
 - [x] Não aceitar campos vazios nem números negativos
@@ -127,7 +133,7 @@ sistema-varejo-novo/
 - [x] Desconto no dinheiro ou Pix (balcão até 5%)
 - [x] Telefone com DDD e letras maiúsculas
 - [x] Vendedor em cada venda e orçamento, e relatório por vendedor
-- [ ] Colocar o sistema online (PythonAnywhere)
+- [x] Colocar o sistema online (PythonAnywhere): https://serafimpai.pythonanywhere.com
 - [ ] Novas melhorias sugeridas pelo usuário
 
 ## 👤 Autor

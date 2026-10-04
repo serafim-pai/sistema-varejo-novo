@@ -61,6 +61,11 @@ Projeto criado para praticar **Python, Git, GitHub, Claude e Scrum**.
 
 40. **Vendas por forma de pagamento** e **vendas por vendedor** (número de vendas, valor vendido e descontos dados).
 
+### 📈 Painel (só o administrador)
+- **Painel**: tela de resumo com vendido **hoje** e **no mês**, **lucro do mês** e quantos produtos precisam de reposição.
+- **Gráfico de barras** das vendas dos últimos 7 dias e **pizza** das formas de pagamento (últimos 30 dias).
+- **Top 5 produtos** mais vendidos e lista dos produtos para repor, do mais crítico para o menos.
+
 ### 🎨 Visual
 41. **Cores no estoque**:
     - 🟢 **Verde**: estoque bom (10 ou mais)
@@ -90,6 +95,7 @@ sistema-varejo-novo/
     ├── index.html      → tela de cadastro de produtos
     ├── vendas.html     → tela de vendas e histórico
     ├── orcamentos.html → tela de orçamentos
+    ├── painel.html     → tela de painel com gráficos (só administrador)
     └── relatorios.html → tela de relatórios
 ```
 
@@ -106,6 +112,13 @@ sistema-varejo-novo/
 3. No navegador, abra: `http://localhost:5000`
 4. Na primeira vez, crie o **administrador master** (nome, e-mail e senha).
 5. Em **Usuários**, crie os usuários do balcão.
+
+## 🧪 Testes
+
+Rodam com um banco temporário (os dados reais não são tocados):
+```
+python -m unittest discover tests -v
+```
 
 ## 🌐 Sistema online
 

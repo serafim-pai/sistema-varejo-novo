@@ -56,7 +56,8 @@ def eh_admin():
 
 def so_admin(caminho, metodo):
     """Diz se esta parte do sistema é só para o ADMINISTRADOR MASTER."""
-    if caminho.startswith(('/usuarios', '/api/usuarios', '/relatorios', '/api/relatorios')):
+    if caminho.startswith(('/usuarios', '/api/usuarios', '/relatorios', '/api/relatorios',
+                           '/painel', '/api/painel')):
         return True
     # Cadastrar, editar, excluir produto e dar entrada no estoque
     if caminho.startswith('/api/produtos') and metodo != 'GET':
@@ -209,6 +210,11 @@ def index():
 @app.route('/vendas')
 def pagina_vendas():
     return render_template('vendas.html')
+
+
+@app.route('/painel')
+def pagina_painel():
+    return render_template('painel.html')
 
 
 @app.route('/relatorios')
@@ -1130,6 +1136,110 @@ def mais_vendidos():
         'por_pagamento': [{'forma': f, 'valor': v}
                           for f, v in sorted(por_pagamento.items(), key=lambda x: -x[1])]
     })
+
+
+# ---------- PAINEL (resumo visual para o administrador) ----------
+
+ESTOQUE_BAIXO_ATE = 9          # de 0 a 9 unidades conta como "para repor"
+DIAS_DO_GRAFICO = 7
+DIAS_DO_RANKING = 30
+DIAS_DA_SEMANA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom']
+
+
+def custo_registrado(venda, produto):
+    """Custo de uma venda: o guardado na hora, ou (vendas antigas) o preço de compra de hoje.
+    Devolve None quando não dá para saber (produto sem preço de compra)."""
+    if venda.custo_total is not None:
+        return venda.custo_total
+    if produto and produto.preco_compra is not None:
+        return venda.quantidade * produto.preco_compra
+    return None
+
+
+def resumo_do_periodo(vendas, produtos):
+    """Soma um grupo de vendas: valor, nº de vendas (carrinho = 1 venda) e lucro."""
+    lucro = 0.0
+    sem_custo = 0
+    for v in vendas:
+        custo = custo_registrado(v, produtos.get(v.produto_id))
+        if custo is None:
+            sem_custo += 1
+        else:
+            lucro += v.valor_total - custo
+    return {'valor': round(sum(v.valor_total for v in vendas), 2),
+            'vendas': len(set(v.data for v in vendas)),
+            'lucro': round(lucro, 2),
+            'itens_sem_custo': sem_custo}
+
+
+def dados_do_painel(session, hoje=None):
+    """Monta todos os números do painel. 'hoje' só existe para os testes."""
+    hoje = hoje or datetime.now().date()
+    inicio_mes = hoje.replace(day=1)
+    inicio_ranking = hoje - timedelta(days=DIAS_DO_RANKING - 1)
+    inicio_grafico = hoje - timedelta(days=DIAS_DO_GRAFICO - 1)
+    inicio = datetime.combine(min(inicio_mes, inicio_ranking), datetime.min.time())
+
+    produtos = {p.id: p for p in session.query(Produto).all()}
+    vendas = session.query(Venda).filter(Venda.data >= inicio).all()
+
+    def entre(dia_inicial, dia_final=None):
+        return [v for v in vendas
+                if v.data.date() >= dia_inicial and (dia_final is None or v.data.date() <= dia_final)]
+
+    grafico = []
+    for i in range(DIAS_DO_GRAFICO):
+        dia = inicio_grafico + timedelta(days=i)
+        do_dia = entre(dia, dia)
+        grafico.append({'dia': dia.strftime('%d/%m'), 'semana': DIAS_DA_SEMANA[dia.weekday()],
+                        'valor': round(sum(v.valor_total for v in do_dia), 2),
+                        'vendas': len(set(v.data for v in do_dia)),
+                        'hoje': dia == hoje})
+
+    do_ranking = entre(inicio_ranking)
+    por_pagamento = {}
+    por_produto = {}
+    for v in do_ranking:
+        forma = v.forma_pagamento or 'NÃO INFORMADO'
+        por_pagamento[forma] = por_pagamento.get(forma, 0.0) + v.valor_total
+        produto = produtos.get(v.produto_id)
+        item = por_produto.setdefault(v.produto_id, {
+            'produto': produto.nome if produto else '(produto excluído)',
+            'unidade': (produto.unidade if produto else None) or 'UN',
+            'quantidade': 0, 'valor': 0.0})
+        item['quantidade'] += v.quantidade
+        item['valor'] += v.valor_total
+
+    top_produtos = sorted(por_produto.values(), key=lambda i: -i['valor'])[:5]
+    for item in top_produtos:
+        item['valor'] = round(item['valor'], 2)
+
+    baixos = sorted((p for p in produtos.values() if p.quantidade <= ESTOQUE_BAIXO_ATE),
+                    key=lambda p: (p.quantidade, p.nome))
+
+    return {
+        'hoje': resumo_do_periodo(entre(hoje, hoje), produtos),
+        'mes': resumo_do_periodo(entre(inicio_mes), produtos),
+        'grafico': grafico,
+        'dias_do_ranking': DIAS_DO_RANKING,
+        'por_pagamento': [{'forma': f, 'valor': round(v, 2)}
+                          for f, v in sorted(por_pagamento.items(), key=lambda x: -x[1])],
+        'top_produtos': top_produtos,
+        'estoque_baixo': {
+            'total': len(baixos),
+            'produtos': [{'nome': p.nome, 'quantidade': p.quantidade, 'unidade': p.unidade or 'UN'}
+                         for p in baixos[:6]]},
+        'total_produtos': len(produtos)
+    }
+
+
+@app.route('/api/painel')
+def api_painel():
+    session = Session()
+    try:
+        return jsonify(dados_do_painel(session))
+    finally:
+        session.close()
 
 
 if __name__ == '__main__':

@@ -7,7 +7,8 @@ import os
 Base = declarative_base()
 # O banco fica sempre ao lado deste arquivo, não importa de onde o sistema é ligado
 # (necessário na hospedagem online, onde a pasta de trabalho é outra).
-CAMINHO_BANCO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'varejo.db')
+# (A variável VAREJO_DB permite usar outro banco, por exemplo nos testes.)
+CAMINHO_BANCO = os.environ.get('VAREJO_DB') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'varejo.db')
 engine = create_engine('sqlite:///' + CAMINHO_BANCO)
 Session = sessionmaker(bind=engine)
 

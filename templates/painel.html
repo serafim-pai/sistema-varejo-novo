@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Painel</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        nav { background: #e65100; padding: 12px 15px; border-radius: 6px; margin-bottom: 15px; }
+        nav a { color: #ffffff; font-weight: 900; font-size: 20px; text-decoration: none;
+                letter-spacing: 0.5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.45);
+                padding: 8px 16px; margin-right: 8px; border-radius: 5px; display: inline-block; }
+        nav a:hover { background: #ff8a3d; }
+        nav a.ativo { background: #ffffff; color: #e65100; }
+
+        .cards { display: flex; flex-wrap: wrap; gap: 12px; }
+        .card { flex: 1; min-width: 180px; background: #f0f0f0; padding: 15px; border-radius: 5px; }
+        .card .numero { font-size: 26px; font-weight: bold; display: block; margin-top: 4px; }
+        .card small { display: block; color: #555; margin-top: 4px; font-size: 13px; }
+        .card.lucro { background: #d4edda; color: #155724; }
+        .card.alerta { background: #fff3cd; color: #856404; }
+        .card.alerta.ok { background: #d4edda; color: #155724; }
+
+        .paineis { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+        .painel { flex: 1 1 300px; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 14px 16px; }
+        .painel h2 { margin: 0 0 12px; font-size: 18px; }
+        .vazio { color: #777; padding: 20px 0; text-align: center; }
+
+        /* Gráfico de barras: uma coluna por dia */
+        .barras { display: flex; align-items: flex-end; gap: 8px; height: 190px; padding-top: 22px;
+                  border-bottom: 2px solid #bbb; }
+        .barra { flex: 1; display: flex; flex-direction: column; justify-content: flex-end;
+                 align-items: center; height: 100%; }
+        .barra .valor { font-size: 11px; color: #333; margin-bottom: 3px; white-space: nowrap; }
+        .barra .coluna { width: 100%; max-width: 46px; background: #ff9800; border-radius: 4px 4px 0 0;
+                         min-height: 2px; }
+        .barra.hoje .coluna { background: #e65100; }
+        .rotulos { display: flex; gap: 8px; margin-top: 6px; }
+        .rotulos div { flex: 1; text-align: center; font-size: 12px; color: #555; }
+        .rotulos b { display: block; color: #222; }
+
+        /* Pizza das formas de pagamento */
+        .pizza-area { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .pizza { width: 150px; height: 150px; border-radius: 50%; flex: none; }
+        .legenda div { margin: 6px 0; font-size: 14px; }
+        .legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+                     margin-right: 6px; vertical-align: -1px; }
+
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border-bottom: 1px solid #eee; padding: 8px 6px; text-align: left; font-size: 14px; }
+        td.num, th.num { text-align: right; }
+        .pos { font-weight: bold; color: #e65100; width: 30px; }
+        .estoque-baixo { background: #fff3cd; color: #856404; font-weight: bold; }
+        .estoque-zerado { background: #f8d7da; color: #721c24; font-weight: bold; }
+        .nota { color: #666; font-size: 12px; margin-top: 10px; }
+        .erro { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    {% set pagina = 'painel' %}
+    {% include '_menu.html' %}
+
+    <h1>📈 Painel</h1>
+    <div class="erro" id="erro" style="display:none"></div>
+
+    <div class="cards">
+        <div class="card">Vendido hoje<span class="numero" id="hojeValor">-</span>
+            <small id="hojeVendas"></small></div>
+        <div class="card">Vendido no mês<span class="numero" id="mesValor">-</span>
+            <small id="mesVendas"></small></div>
+        <div class="card lucro">Lucro no mês<span class="numero" id="mesLucro">-</span>
+            <small id="mesLucroNota"></small></div>
+        <div class="card alerta" id="cardEstoque">Estoque para repor<span class="numero" id="estoqueTotal">-</span>
+            <small id="estoqueNota"></small></div>
+    </div>
+
+    <div class="paineis">
+        <div class="painel" style="flex: 2 1 340px;">
+            <h2>Vendas dos últimos 7 dias</h2>
+            <div id="grafico"></div>
+        </div>
+        <div class="painel">
+            <h2>Formas de pagamento <small style="font-weight:normal;color:#666">(últimos 30 dias)</small></h2>
+            <div id="pizza"></div>
+        </div>
+    </div>
+
+    <div class="paineis">
+        <div class="painel">
+            <h2>🏆 Top 5 produtos <small style="font-weight:normal;color:#666">(últimos 30 dias)</small></h2>
+            <div id="top"></div>
+        </div>
+        <div class="painel">
+            <h2>⚠️ Produtos para repor</h2>
+            <div id="repor"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/escapar.js') }}"></script>
+    <script>
+        const CORES = {'DINHEIRO': '#2e7d32', 'PIX': '#00897b', 'CARTÃO DE DÉBITO': '#1565c0',
+                       'CARTÃO DE CRÉDITO': '#6a1b9a', 'NÃO INFORMADO': '#9e9e9e'};
+
+        function dinheiro(v) {
+            return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }
+        function porId(id) { return document.getElementById(id); }
+
+        function desenharGrafico(dias) {
+            const maior = Math.max(...dias.map(d => d.valor), 0);
+            if (maior === 0) {
+                porId('grafico').innerHTML = '<div class="vazio">Nenhuma venda nos últimos 7 dias.</div>';
+                return;
+            }
+            porId('grafico').innerHTML =
+                '<div class="barras">' + dias.map(d =>
+                    `<div class="barra ${d.hoje ? 'hoje' : ''}" title="${escapar(d.dia)}: ${plural(d.vendas, 'venda', 'vendas')}">
+                        <span class="valor">${d.valor > 0 ? dinheiro(d.valor) : ''}</span>
+                        <div class="coluna" style="height:${Math.round(d.valor / maior * 100)}%"></div>
+                    </div>`).join('') + '</div>' +
+                '<div class="rotulos">' + dias.map(d =>
+                    `<div><b>${d.hoje ? 'hoje' : escapar(d.semana)}</b>${escapar(d.dia)}</div>`).join('') + '</div>';
+        }
+
+        function desenharPizza(formas) {
+            const total = formas.reduce((s, f) => s + f.valor, 0);
+            if (total <= 0) {
+                porId('pizza').innerHTML = '<div class="vazio">Nenhuma venda no período.</div>';
+                return;
+            }
+            let acumulado = 0;
+            const fatias = formas.map(f => {
+                const inicio = acumulado / total * 100;
+                acumulado += f.valor;
+                return `${CORES[f.forma] || '#9e9e9e'} ${inicio}% ${acumulado / total * 100}%`;
+            });
+            porId('pizza').innerHTML =
+                `<div class="pizza-area">
+                    <div class="pizza" style="background: conic-gradient(${fatias.join(', ')})"></div>
+                    <div class="legenda">` + formas.map(f =>
+                        `<div><i style="background:${CORES[f.forma] || '#9e9e9e'}"></i>${escapar(f.forma)}
+                         — <b>${Math.round(f.valor / total * 100)}%</b> (${dinheiro(f.valor)})</div>`).join('') +
+                    '</div></div>';
+        }
+
+        function desenharTop(lista) {
+            if (!lista.length) {
+                porId('top').innerHTML = '<div class="vazio">Nenhuma venda no período.</div>';
+                return;
+            }
+            porId('top').innerHTML = '<table><tr><th></th><th>Produto</th><th class="num">Qtd.</th>' +
+                '<th class="num">Valor</th></tr>' + lista.map((p, i) =>
+                `<tr><td class="pos">${i + 1}º</td><td>${escapar(p.produto)}</td>
+                 <td class="num">${p.quantidade} ${escapar(p.unidade)}</td>
+                 <td class="num">${dinheiro(p.valor)}</td></tr>`).join('') + '</table>';
+        }
+
+        function desenharRepor(estoque) {
+            if (!estoque.total) {
+                porId('repor').innerHTML = '<div class="vazio">✅ Todos os produtos com estoque bom.</div>';
+                return;
+            }
+            let html = '<table><tr><th>Produto</th><th class="num">Estoque</th></tr>' + estoque.produtos.map(p =>
+                `<tr><td>${escapar(p.nome)}</td>
+                 <td class="num ${p.quantidade <= 0 ? 'estoque-zerado' : 'estoque-baixo'}">
+                 ${p.quantidade <= 0 ? '🔴 0' : p.quantidade} ${escapar(p.unidade)}</td></tr>`).join('') + '</table>';
+            if (estoque.total > estoque.produtos.length) {
+                html += `<div class="nota">e mais ${estoque.total - estoque.produtos.length} produto(s)…</div>`;
+            }
+            html += '<div class="nota">Para repor, use o botão <b>+ Entrada</b> em <a href="/">Produtos</a>.</div>';
+            porId('repor').innerHTML = html;
+        }
+
+        function desenhar(d) {
+            porId('hojeValor').textContent = dinheiro(d.hoje.valor);
+            porId('hojeVendas').textContent = plural(d.hoje.vendas, 'venda', 'vendas');
+            porId('mesValor').textContent = dinheiro(d.mes.valor);
+            porId('mesVendas').textContent = plural(d.mes.vendas, 'venda', 'vendas');
+            porId('mesLucro').textContent = dinheiro(d.mes.lucro);
+            porId('mesLucroNota').textContent = d.mes.itens_sem_custo > 0
+                ? plural(d.mes.itens_sem_custo, 'item sem preço de compra ficou', 'itens sem preço de compra ficaram') + ' fora da conta'
+                : '';
+
+            porId('estoqueTotal').textContent = plural(d.estoque_baixo.total, 'produto', 'produtos');
+            porId('estoqueNota').textContent = d.estoque_baixo.total ? 'com 9 unidades ou menos' : 'tudo em dia';
+            porId('cardEstoque').classList.toggle('ok', d.estoque_baixo.total === 0);
+
+            desenharGrafico(d.grafico);
+            desenharPizza(d.por_pagamento);
+            desenharTop(d.top_produtos);
+            desenharRepor(d.estoque_baixo);
+        }
+
+        fetch('/api/painel')
+            .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+            .then(desenhar)
+            .catch(() => {
+                porId('erro').style.display = 'block';
+                porId('erro').textContent = 'Não foi possível carregar o painel. Recarregue a página.';
+            });
+    </script>
+</body>
+</html>

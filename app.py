@@ -3,7 +3,9 @@ from flask import session as login          # "login" guarda quem está usando o
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import (Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, Cliente, UNIDADES,
-                      FORMAS_PAGAMENTO, FORMAS_COM_DESCONTO, DESCONTO_MAXIMO_BALCAO, agora_brasil)
+                      FORMAS_PAGAMENTO, FORMAS_COM_DESCONTO, DESCONTO_MAXIMO_BALCAO, agora_brasil,
+                      TentativaLogin)
+import math
 import re
 from datetime import datetime, timedelta
 import os
@@ -23,6 +25,17 @@ with open(ARQUIVO_CHAVE) as arquivo:
     app.secret_key = arquivo.read().strip()
 
 app.permanent_session_lifetime = timedelta(hours=12)   # login vale por 12 horas
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'          # o navegador não manda o login em pedidos vindos de outros sites
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('VAREJO_HTTPS') == '1'   # ligado na hospedagem (https)
+
+
+@app.after_request
+def cabecalhos_de_seguranca(resposta):
+    """Cabeçalhos que pedem ao navegador para se proteger (tela dentro de outro site, tipo de arquivo trocado)."""
+    resposta.headers.setdefault('X-Frame-Options', 'DENY')
+    resposta.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    resposta.headers.setdefault('Referrer-Policy', 'same-origin')
+    return resposta
 
 # ---------- PROTEÇÃO CONTRA CSRF ----------
 # Protege automaticamente toda rota que muda dados (POST, PUT, PATCH, DELETE).
@@ -120,6 +133,14 @@ def conferir_login():
     return None
 
 
+def numero_finito(texto):
+    """float() que recusa NaN e infinito (que passariam por 'maior que zero' e estragariam os totais)."""
+    valor = float(texto)
+    if not math.isfinite(valor):
+        raise ValueError('número não finito')
+    return valor
+
+
 # ---------- LEITURA SEGURA DO JSON ----------
 
 def dados_requisicao():
@@ -139,6 +160,17 @@ def dados_para_as_telas():
     return {'usuario': usuario_logado(), 'admin': eh_admin()}
 
 
+MAX_ERROS_LOGIN = 5          # erros seguidos de senha para o mesmo e-mail
+MINUTOS_BLOQUEIO_LOGIN = 10  # quanto tempo o e-mail fica sem poder tentar
+
+
+def login_bloqueado(session, email):
+    """True se o e-mail errou a senha vezes demais nos últimos minutos."""
+    limite = agora_brasil() - timedelta(minutes=MINUTOS_BLOQUEIO_LOGIN)
+    erros = session.query(TentativaLogin).filter(TentativaLogin.email == email, TentativaLogin.quando >= limite).count()
+    return erros >= MAX_ERROS_LOGIN
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def pagina_login():
     erro = 'Sua sessão expirou. Tente entrar de novo.' if request.args.get('expirou') else None
@@ -148,11 +180,17 @@ def pagina_login():
         senha = request.form.get('chave', '')
         session = Session()
         usuario = session.query(Usuario).filter_by(email=email).first()
-        if not usuario or not check_password_hash(usuario.senha_hash, senha):
+        if login_bloqueado(session, email):
+            erro = f'Muitas tentativas erradas. Espere {MINUTOS_BLOQUEIO_LOGIN} minutos e tente de novo.'
+        elif not usuario or not check_password_hash(usuario.senha_hash, senha):
+            session.add(TentativaLogin(email=email[:120]))
+            session.commit()
             erro = 'E-mail ou senha errados.'
         elif not usuario.ativo:
             erro = 'Este usuário está bloqueado. Fale com o administrador.'
         else:
+            session.query(TentativaLogin).filter_by(email=email).delete()
+            session.commit()
             login.clear()
             login.permanent = True
             login['usuario_id'] = usuario.id
@@ -194,7 +232,7 @@ def primeiro_acesso():
                            nome=dados.get('nome', ''), email=dados.get('email', ''))
 
 
-@app.route('/sair')
+@app.route('/sair', methods=['POST'])   # só POST: um link de outro site não consegue deslogar ninguém
 def sair():
     login.clear()
     return redirect('/login')
@@ -455,7 +493,7 @@ def validar_produto(dados):
         return 'A categoria precisa ter pelo menos 2 letras.', None
 
     try:
-        preco = float(dados.get('preco'))
+        preco = numero_finito(dados.get('preco'))
     except (TypeError, ValueError):
         return 'Digite um preço válido.', None
 
@@ -479,14 +517,14 @@ def validar_produto(dados):
     texto_margem = str(dados.get('margem') or '').strip().replace(',', '.')
     if texto_compra:
         try:
-            preco_compra = float(texto_compra)
+            preco_compra = numero_finito(texto_compra)
         except ValueError:
             return 'Digite um preço de compra válido.', None
         if preco_compra < 0:
             return 'O preço de compra não pode ser negativo.', None
     if texto_margem:
         try:
-            margem = float(texto_margem)
+            margem = numero_finito(texto_margem)
         except ValueError:
             return 'Digite uma porcentagem válida.', None
 
@@ -768,7 +806,7 @@ def finalizar_pedido():
     texto_recebido = str(dados.get('valor_recebido') or '').strip().replace(',', '.')
     if forma_pagamento == 'DINHEIRO' and texto_recebido:
         try:
-            valor_recebido = float(texto_recebido)
+            valor_recebido = numero_finito(texto_recebido)
         except ValueError:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': 'Digite um valor recebido válido.'})
@@ -829,7 +867,7 @@ def finalizar_pedido():
     # Desconto (em %): só no DINHEIRO ou PIX; balcão até 5%
     texto_desconto = str(dados.get('desconto_percentual') or '').strip().replace(',', '.')
     try:
-        desconto_percentual = float(texto_desconto) if texto_desconto else 0.0
+        desconto_percentual = numero_finito(texto_desconto) if texto_desconto else 0.0
     except ValueError:
         session.close()
         return jsonify({'sucesso': False, 'mensagem': 'Digite um desconto válido.'})

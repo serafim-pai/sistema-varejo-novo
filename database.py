@@ -125,6 +125,15 @@ class OrcamentoItem(Base):
     preco = Column(Float, nullable=False)
 
 
+class TentativaLogin(Base):
+    """Uma senha errada no login (para travar quem fica adivinhando senhas)."""
+    __tablename__ = 'tentativas_login'
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(120), nullable=False, index=True)
+    quando = Column(DateTime, nullable=False, default=agora_brasil)
+
+
 Base.metadata.create_all(engine)
 
 # Atualização do banco: se a tabela de produtos ainda não tem a coluna "unidade",

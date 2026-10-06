@@ -36,7 +36,10 @@
     {% if usuario %}
     <span class="quem">
         <span>👤 {{ usuario.nome }} <span class="etiqueta">{{ 'ADMIN' if admin else 'BALCÃO' }}</span></span>
-        <a href="/sair">Sair</a>
+        <form method="post" action="/sair" style="display:inline; margin:0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" style="background:none; border:none; padding:0; margin:0; font:inherit; color:inherit; text-decoration:underline; cursor:pointer">Sair</button>
+        </form>
     </span>
     {% endif %}
 </nav>

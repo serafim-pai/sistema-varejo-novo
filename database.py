@@ -1,8 +1,22 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
+
+# Horário de Brasília (o Brasil não tem mais horário de verão). O servidor online trabalha em UTC,
+# 3 horas à frente, e o computador de quem usa em casa trabalha no horário local: para os dois gravarem
+# a mesma hora, o sistema NÃO usa o relógio da máquina e sempre calcula o horário de Brasília.
+FUSO_BRASIL = timezone(timedelta(hours=-3))
+
+
+def agora_brasil(*, agora_utc=None):
+    """Data e hora de agora no horário de Brasília, sem fuso (do jeito que o banco guarda).
+    ('agora_utc' só existe para os testes. É só nomeado para o SQLAlchemy, que usa esta função como
+    valor padrão das colunas, não tentar passar nada a ela.)"""
+    agora_utc = agora_utc or datetime.now(timezone.utc)
+    return agora_utc.astimezone(FUSO_BRASIL).replace(tzinfo=None)
+
 
 Base = declarative_base()
 # O banco fica sempre ao lado deste arquivo, não importa de onde o sistema é ligado
@@ -47,7 +61,7 @@ class Usuario(Base):
     senha_hash = Column(String(255), nullable=False)   # a senha nunca é guardada "aberta"
     tipo = Column(String(10), nullable=False, default='SIMPLES')
     ativo = Column(Integer, nullable=False, default=1)  # 1 = pode entrar, 0 = bloqueado
-    criado_em = Column(DateTime, default=datetime.now)
+    criado_em = Column(DateTime, default=agora_brasil)
 
 
 class Cliente(Base):
@@ -59,7 +73,7 @@ class Cliente(Base):
     telefone = Column(String(30), nullable=True)
     endereco = Column(String(200), nullable=True)
     documento = Column(String(20), nullable=True)   # CPF ou CNPJ (opcional)
-    criado_em = Column(DateTime, default=datetime.now)
+    criado_em = Column(DateTime, default=agora_brasil)
 
 
 class Venda(Base):
@@ -70,7 +84,7 @@ class Venda(Base):
     quantidade = Column(Integer, nullable=False)
     valor_total = Column(Float, nullable=False)
     custo_total = Column(Float, nullable=True)   # quanto a loja pagou por esses itens (preço de compra do dia)
-    data = Column(DateTime, default=datetime.now)
+    data = Column(DateTime, default=agora_brasil)
     # Cliente da venda (opcional) e endereço de entrega
     cliente_id = Column(Integer, nullable=True)
     cliente = Column(String(100), nullable=True)
@@ -90,7 +104,7 @@ class Orcamento(Base):
     cliente = Column(String(100), nullable=False)
     telefone = Column(String(30), nullable=True)
     endereco = Column(String(200), nullable=True)                      # endereço de entrega
-    data = Column(DateTime, default=datetime.now)
+    data = Column(DateTime, default=agora_brasil)
     validade_dias = Column(Integer, nullable=False, default=7)
     situacao = Column(String(20), nullable=False, default='ABERTO')   # ABERTO, VIROU VENDA, CANCELADO
     venda_numero = Column(Integer, nullable=True)                      # nº da venda, quando virar venda

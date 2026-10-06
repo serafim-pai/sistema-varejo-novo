@@ -3,7 +3,7 @@ from flask import session as login          # "login" guarda quem está usando o
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import (Session, Produto, Venda, Orcamento, OrcamentoItem, Usuario, Cliente, UNIDADES,
-                      FORMAS_PAGAMENTO, FORMAS_COM_DESCONTO, DESCONTO_MAXIMO_BALCAO)
+                      FORMAS_PAGAMENTO, FORMAS_COM_DESCONTO, DESCONTO_MAXIMO_BALCAO, agora_brasil)
 import re
 from datetime import datetime, timedelta
 import os
@@ -859,7 +859,7 @@ def finalizar_pedido():
                             'mensagem': f'Valor recebido (R$ {valor_recebido:.2f}) é menor que o total (R$ {total_previsto:.2f}).'})
 
     # 2) Tudo certo: dá baixa no estoque e registra as vendas
-    agora = datetime.now()
+    agora = agora_brasil()
     comprovante = []
     ids = []
     for produto_id, quantidade in quantidades.items():
@@ -915,7 +915,7 @@ def finalizar_pedido():
 def situacao_orcamento(orcamento):
     """Calcula a situação do orçamento pela idade dele.
     Devolve (situacao, dias_desde_que_foi_feito, dias_que_faltam_para_vencer)."""
-    dias = (datetime.now().date() - orcamento.data.date()).days
+    dias = (agora_brasil().date() - orcamento.data.date()).days
     faltam = orcamento.validade_dias - dias
     if orcamento.situacao in ('VIROU VENDA', 'CANCELADO'):
         return orcamento.situacao, dias, faltam
@@ -971,7 +971,7 @@ def orcamentos():
         except ValueError:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': 'Escolha a data de validade do orçamento.'})
-        validade_dias = (validade - datetime.now().date()).days
+        validade_dias = (validade - agora_brasil().date()).days
         if validade_dias < 0:
             session.close()
             return jsonify({'sucesso': False, 'mensagem': 'A data de validade não pode ser antes de hoje.'})
@@ -987,7 +987,7 @@ def orcamentos():
             return jsonify({'sucesso': False, 'mensagem': 'O carrinho está vazio.'})
 
         orcamento = Orcamento(cliente=cliente, telefone=telefone, endereco=endereco,
-                              data=datetime.now(), validade_dias=validade_dias,
+                              data=agora_brasil(), validade_dias=validade_dias,
                               vendedor_id=usuario_logado()['id'], vendedor=usuario_logado()['nome'])
         session.add(orcamento)
         session.flush()
@@ -1174,7 +1174,7 @@ def resumo_do_periodo(vendas, produtos):
 
 def dados_do_painel(session, hoje=None):
     """Monta todos os números do painel. 'hoje' só existe para os testes."""
-    hoje = hoje or datetime.now().date()
+    hoje = hoje or agora_brasil().date()
     inicio_mes = hoje.replace(day=1)
     inicio_ranking = hoje - timedelta(days=DIAS_DO_RANKING - 1)
     inicio_grafico = hoje - timedelta(days=DIAS_DO_GRAFICO - 1)

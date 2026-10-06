@@ -120,6 +120,12 @@ Rodam com um banco temporário (os dados reais não são tocados):
 python -m unittest discover tests -v
 ```
 
+## 🕒 Horário
+
+O sistema grava e mostra tudo no **horário de Brasília**, em qualquer máquina: ele não usa o relógio do computador (no servidor online o relógio é UTC, 3 horas à frente), e sim a função `agora_brasil()` do `database.py`. O "hoje" do Painel, a validade dos orçamentos e a data das vendas usam essa mesma hora.
+
+**Correção única do banco do servidor** (`corrigir_horario_utc.py`): as vendas, orçamentos, clientes e usuários gravados *antes* dessa mudança estavam 3 horas adiantados no servidor. O script atrasa essas horas em 3 horas, uma única vez: guarda uma cópia do banco antes, anota que já rodou (rodar de novo não faz nada) e tem o modo `--ver`, que só mostra o que mudaria. **Não rode no computador de casa**, onde as horas já estão certas.
+
 ## 🌐 Sistema online
 
 O sistema está no ar (PythonAnywhere, plano gratuito): **https://serafimpai.pythonanywhere.com**

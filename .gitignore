@@ -2,8 +2,9 @@
 __pycache__/
 *.pyc
 
-# Banco de dados local (cada computador tem o seu)
+# Banco de dados local (cada computador tem o seu) e as cópias de segurança dele
 *.db
+*.db.antes-do-horario-*
 
 # Ambiente virtual
 venv/
